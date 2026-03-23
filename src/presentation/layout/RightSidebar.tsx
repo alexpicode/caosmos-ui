@@ -47,6 +47,7 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
   const cognition = useCognitionPolling(uuid);
   const cognitionHistory = useCitizenStore(s => s.cognitionHistory);
   const pinCitizen = useCitizenStore(s => s.pinCitizen);
+  const unpinCitizen = useCitizenStore(s => s.unpinCitizen);
   const pinnedIds = useCitizenStore(s => s.pinnedCitizenIds);
   const isPinned = pinnedIds.has(uuid);
 
@@ -69,7 +70,7 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
           </div>
         </div>
         <button
-          onClick={() => pinCitizen(uuid)}
+          onClick={() => isPinned ? unpinCitizen(uuid) : pinCitizen(uuid)}
           className="text-xs px-2 py-1 rounded transition-colors"
           style={{
             background: isPinned ? 'rgba(6,182,212,0.15)' : 'rgba(30,41,59,0.8)',
@@ -234,9 +235,9 @@ function PinnedCard({ citizen }: { citizen: CitizenSummary }) {
     >
       <button
         onClick={e => { e.stopPropagation(); unpinCitizen(citizen.uuid); }}
-        className="absolute top-1.5 right-1.5 text-slate-600 hover:text-red-400 text-xs"
+        className="absolute top-1.5 right-1.5 text-slate-600 hover:text-red-400 text-xs z-10 p-1"
       >✕</button>
-      <div className="flex items-center gap-2 mb-1.5">
+      <div className="flex items-center gap-2 mb-1.5 pr-5">
         <div className="w-2 h-2 rounded-full" style={{ background: vitalityColor(citizen.vitality) }} />
         <span className="text-slate-200 text-xs font-medium">{citizen.name}</span>
         <span className={`badge text-xs ml-auto ${stateBadgeClass(citizen.state)}`}>{citizen.state}</span>

@@ -733,6 +733,7 @@ CitizenSprite
 │                           ⚠ Hunger (hunger > 70)
 │                           ⚡ Low Energy (energy < 20)
 │                           😰 Stress (stress > 60)
+├── Hover Tooltip         — A HTML DOM overlay tooltip appears when the pointer hovers over the sprite, showing its name.
 ├── Name Label (optional) — Visible only at high zoom levels (zoom > 0.6)
 └── Pulse Animation       — Scale oscillation (1.0 → 1.15 → 1.0) based on vitality
                             Faster pulse = lower vitality (distress signal)
@@ -764,6 +765,7 @@ For each tracked citizen with `visibleLayers.trails === true`:
 
 - **Pan**: Click-drag on empty space.
 - **Zoom**: Mouse wheel. Min zoom: 0.05 (see entire world). Max zoom: 3.0 (street level).
+- **Hover**: Pointer over a citizen or object displays a tooltip with its name via React state (`hoveredInfo`) mapped to DOM absolute positioning.
 - **Follow mode**: When a citizen is selected, the camera smoothly tracks their position using a lerp on the camera offset.
 - The camera exposes its world-space bounding box to `useViewportBounds` on every frame.
 

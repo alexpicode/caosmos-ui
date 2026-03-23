@@ -72,8 +72,11 @@ export function MapViewport() {
 
   // Sprite maps
   const citizenSprites = useRef<Map<string, Container>>(new Map());
-  // Target positions for interpolation
   const citizenTargets = useRef<Map<string, { sx: number; sy: number }>>(new Map());
+  const entitySprites = useRef<Map<string, Graphics>>(new Map());
+
+  // Tooltip overlay state
+  const [hoveredInfo, setHoveredInfo] = React.useState<{ text: string; x: number; y: number } | null>(null);
 
   // Store access
   const visibleLayers = useUIStore(s => s.visibleLayers);
@@ -259,6 +262,9 @@ export function MapViewport() {
         sprite.eventMode = 'static';
         sprite.cursor = 'pointer';
         sprite.on('pointerdown', () => selectCitizen(c.uuid));
+        sprite.on('pointerenter', (e) => setHoveredInfo({ text: c.name, x: e.client.x, y: e.client.y }));
+        sprite.on('pointermove', (e) => setHoveredInfo(prev => prev ? { ...prev, x: e.client.x, y: e.client.y } : prev));
+        sprite.on('pointerleave', () => setHoveredInfo(null));
         layer.addChild(sprite);
         citizenSprites.current.set(c.uuid, sprite);
       }
@@ -374,16 +380,36 @@ export function MapViewport() {
   function renderEntities(entitiesList: WorldEntitySummary[], W: number, H: number) {
     if (!entityLayerRef.current) return;
     const layer = entityLayerRef.current;
-    layer.removeChildren();
+    const seenIds = new Set<string>();
 
     for (const entity of entitiesList) {
+      seenIds.add(entity.id);
       const { sx, sy } = worldToScreen(entity.x, entity.z, getCam(), getZoom(), W, H);
+      
+      let g = entitySprites.current.get(entity.id);
+      if (!g) {
+        g = new Graphics();
+        g.eventMode = 'static';
+        g.cursor = 'help';
+        g.on('pointerenter', (e) => setHoveredInfo({ text: entity.displayName, x: e.client.x, y: e.client.y }));
+        g.on('pointermove', (e) => setHoveredInfo(prev => prev ? { ...prev, x: e.client.x, y: e.client.y } : prev));
+        g.on('pointerleave', () => setHoveredInfo(null));
+        layer.addChild(g);
+        entitySprites.current.set(entity.id, g);
+      }
+      
       const color = entityColor(entity.type);
-      const g = new Graphics();
+      g.clear();
       g.rect(sx - 3, sy - 3, 6, 6)
        .fill({ color });
-      layer.addChild(g);
     }
+
+    entitySprites.current.forEach((g, id) => {
+      if (!seenIds.has(id)) {
+        layer.removeChild(g);
+        entitySprites.current.delete(id);
+      }
+    });
   }
 
   function drawChunkGrid(layer: Container, chunkList: ChunkInfo[], camera: { x: number; y: number }, zoom: number, W: number, H: number) {
@@ -522,15 +548,25 @@ export function MapViewport() {
   }, [selectedId, updateViewportBounds]);
 
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 relative overflow-hidden"
-      style={{ cursor: isDragging.current ? 'grabbing' : 'grab', background: '#020617' }}
-      onWheel={handleWheel}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    />
+    <>
+      <div
+        ref={containerRef}
+        className="flex-1 relative overflow-hidden"
+        style={{ cursor: isDragging.current ? 'grabbing' : 'grab', background: '#020617' }}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      />
+      {hoveredInfo && (
+        <div 
+          className="absolute pointer-events-none z-50 glass px-2 py-1 text-xs rounded shadow-lg text-slate-200"
+          style={{ left: hoveredInfo.x + 10, top: hoveredInfo.y + 10 }}
+        >
+          {hoveredInfo.text}
+        </div>
+      )}
+    </>
   );
 }
