@@ -110,6 +110,7 @@ function mapPerception(raw: Raw): CitizenPerception {
   return {
     identity: mapIdentity(raw?.identity),
     status: mapStatus(raw?.status),
+    state: str(raw?.state, 'IDLE'),
     equipment: mapEquipment(raw?.equipment),
     inventory: mapInventory(raw?.inventory),
     lastAction: mapLastAction(raw?.lastAction),

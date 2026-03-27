@@ -52,7 +52,7 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
   const isPinned = pinnedIds.has(uuid);
 
   const { perception, currentAction, biometrics } = detail;
-  const { identity, status, equipment, inventory, activeTask, lastAction } = perception;
+  const { identity, status, state, equipment, inventory, activeTask, lastAction } = perception;
 
   const biometricVitality = biometrics.slice(-20).map(b => b.vitality);
   const biometricEnergy = biometrics.slice(-20).map(b => b.energy);
@@ -61,8 +61,13 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
     <div className="flex flex-col gap-3 animate-fade-in">
       {/* Identity header */}
       <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-slate-100 font-semibold text-sm">{identity.name}</h2>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-slate-100 font-semibold text-sm truncate">{identity.name}</h2>
+            <span className={`badge text-[10px] leading-none py-0.5 ${stateBadgeClass(state)}`}>
+              {state}
+            </span>
+          </div>
           <div className="flex flex-wrap gap-1 mt-1">
             {identity.traits.map(t => (
               <span key={t} className="badge badge-idle text-slate-400">{t}</span>

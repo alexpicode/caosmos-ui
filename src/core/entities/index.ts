@@ -104,6 +104,7 @@ export interface ActiveTask {
 export interface CitizenPerception {
   identity: Identity;
   status: CitizenStatus;
+  state: string;
   equipment: Equipment;
   inventory: Inventory;
   lastAction: LastAction | null;
