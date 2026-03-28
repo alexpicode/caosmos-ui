@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import {
   Application, Container, Graphics, Text, TextStyle,
-  FederatedPointerEvent
+  FederatedPointerEvent, Circle
 } from 'pixi.js';
 import { useWorldStore } from '@store/useWorldStore';
 import { useCitizenStore } from '@store/useCitizenStore';
@@ -11,6 +11,7 @@ import type { CitizenSummary, ChunkInfo, Zone, WorldEntitySummary } from '@core/
 
 // ─── Constants ──────────────────────────────────────────────
 const CITIZEN_RADIUS = 7;
+const CITIZEN_VISION_RANGE = 30; // visual perception radius in world units
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 4.0;
 const WORLD_SCALE = 4; // world units → pixels (1 world unit = 4px)
@@ -18,11 +19,11 @@ const WORLD_SCALE = 4; // world units → pixels (1 world unit = 4px)
 // State colours for citizen sprites
 function citizenColor(state: string): number {
   switch (state.toUpperCase()) {
-    case 'WORKING':  return 0x10b981;
-    case 'MOVING':   return 0x3b82f6;
-    case 'EATING':   return 0xf59e0b;
+    case 'WORKING': return 0x10b981;
+    case 'MOVING': return 0x3b82f6;
+    case 'EATING': return 0xf59e0b;
     case 'IDLE':
-    default:         return 0x06b6d4;
+    default: return 0x06b6d4;
   }
 }
 
@@ -86,6 +87,12 @@ export function MapViewport() {
   const setViewportBounds = useUIStore(s => s.setViewportBounds);
   const setZoomLevel = useUIStore(s => s.setZoomLevel);
   const selectCitizen = useCitizenStore(s => s.selectCitizen);
+  const selectedId = useCitizenStore(s => s.selectedCitizenId);
+
+  const citizens = useWorldStore(s => s.citizens);
+  const zones = useWorldStore(s => s.zones);
+  const chunks = useWorldStore(s => s.chunks);
+  const entities = useWorldStore(s => s.entities);
 
   // ── Initialize PixiJS ─────────────────────────────────────
   useEffect(() => {
@@ -153,7 +160,7 @@ export function MapViewport() {
 
         app.renderer.resize(w, h);
         updateViewportBounds(w, h);
-        
+
         // Re-render the grid on resize because the background must span the new dimensions
         drawChunkGrid(terrainLayerRef.current!, useWorldStore.getState().chunks, cameraRef.current, zoomRef.current, w, h);
         renderZones(useWorldStore.getState().zones, w, h);
@@ -169,7 +176,7 @@ export function MapViewport() {
       isDestroyed = true;
       if (fallbackApp) {
         // Must catch if destroy throws during mid-initialization
-        try { fallbackApp.destroy(true, { children: true }); } catch (e) {}
+        try { fallbackApp.destroy(true, { children: true }); } catch (e) { }
       }
       appRef.current = null;
       citizenSprites.current.clear();
@@ -186,7 +193,6 @@ export function MapViewport() {
   }, [setViewportBounds, setZoomLevel]);
 
   // ── Reactive: citizens data changed ─────────────────────────
-  const citizens = useWorldStore(s => s.citizens);
   useEffect(() => {
     if (!appRef.current || !citizenLayerRef.current || !trailLayerRef.current) return;
     const app = appRef.current;
@@ -198,9 +204,8 @@ export function MapViewport() {
       renderTrails(citizens, W, H);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [citizens]);
+  }, [citizens, selectedId]);
 
-  const zones = useWorldStore(s => s.zones);
   useEffect(() => {
     if (!appRef.current || !zoneLayerRef.current) return;
     const app = appRef.current;
@@ -210,7 +215,6 @@ export function MapViewport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zones]);
 
-  const chunks = useWorldStore(s => s.chunks);
   useEffect(() => {
     if (!appRef.current || !terrainLayerRef.current) return;
     const app = appRef.current;
@@ -220,7 +224,6 @@ export function MapViewport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chunks]);
 
-  const entities = useWorldStore(s => s.entities);
   useEffect(() => {
     if (!appRef.current || !entityLayerRef.current) return;
     const app = appRef.current;
@@ -272,8 +275,8 @@ export function MapViewport() {
       // Update target position for lerp
       citizenTargets.current.set(c.uuid, { sx, sy });
 
-      // Update color based on state
-      updateCitizenSprite(sprite, c);
+      // Update color based on state and selection
+      updateCitizenSprite(sprite, c, c.uuid === selectedId);
     });
 
     // Remove despawned citizens
@@ -289,41 +292,54 @@ export function MapViewport() {
   function createCitizenSprite(c: CitizenSummary): Container {
     const container = new Container();
     const g = new Graphics();
-    drawCitizenGlyph(g, c);
+    drawCitizenGlyph(g, c, c.uuid === selectedId);
     container.addChild(g);
+
+    // Limit hit area to the citizen icon itself, ignoring the vision circle
+    container.hitArea = new Circle(0, 0, CITIZEN_RADIUS + 3);
+
     return container;
   }
 
-  function drawCitizenGlyph(g: Graphics, c: CitizenSummary) {
+  function drawCitizenGlyph(g: Graphics, c: CitizenSummary, isSelected: boolean) {
     g.clear();
     const color = citizenColor(c.state);
     const vColor = parseInt(vitalityColor(c.vitality).replace('#', '0x'));
+    const zoom = zoomRef.current;
+
+    // Vision range circle (if selected)
+    if (isSelected) {
+      const visionRadius = CITIZEN_VISION_RANGE * WORLD_SCALE * zoom;
+      g.circle(0, 0, visionRadius)
+        .fill({ color: 0x06b6d4, alpha: 0.12 })
+        .stroke({ color: 0x06b6d4, width: 1, alpha: 0.3 });
+    }
 
     // Outer glow ring (vitality indicator)
     g.circle(0, 0, CITIZEN_RADIUS + 3)
-     .fill({ color: vColor, alpha: 0.15 });
+      .fill({ color: vColor, alpha: 0.15 });
 
     // Vitality arc
     const vPct = c.vitality / 100;
     if (vPct > 0) {
       g.arc(0, 0, CITIZEN_RADIUS + 2, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * vPct)
-       .stroke({ color: vColor, width: 2, alpha: 0.8 });
+        .stroke({ color: vColor, width: 2, alpha: 0.8 });
     }
 
     // Main body
     g.circle(0, 0, CITIZEN_RADIUS)
-     .fill({ color });
+      .fill({ color });
 
     // State indicator dot (stress/hunger)
     if (c.vitality < 35) {
       g.circle(CITIZEN_RADIUS - 2, -(CITIZEN_RADIUS - 2), 3)
-       .fill({ color: 0xef4444 });
+        .fill({ color: 0xef4444 });
     }
   }
 
-  function updateCitizenSprite(container: Container, c: CitizenSummary) {
+  function updateCitizenSprite(container: Container, c: CitizenSummary, isSelected: boolean) {
     const g = container.children[0] as Graphics;
-    if (g) drawCitizenGlyph(g, c);
+    if (g) drawCitizenGlyph(g, c, isSelected);
   }
 
   function renderTrails(citizenMap: typeof citizens, W: number, H: number) {
@@ -366,8 +382,8 @@ export function MapViewport() {
 
       const g = new Graphics();
       g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
-       .fill({ color: 0x8b5cf6, alpha: 0.06 })
-       .stroke({ color: 0x8b5cf6, width: 1, alpha: 0.4 });
+        .fill({ color: 0x8b5cf6, alpha: 0.06 })
+        .stroke({ color: 0x8b5cf6, width: 1, alpha: 0.4 });
 
       const label = new Text({ text: zone.name, style: textStyle });
       label.x = sx - label.width / 2;
@@ -385,7 +401,7 @@ export function MapViewport() {
     for (const entity of entitiesList) {
       seenIds.add(entity.id);
       const { sx, sy } = worldToScreen(entity.x, entity.z, getCam(), getZoom(), W, H);
-      
+
       let g = entitySprites.current.get(entity.id);
       if (!g) {
         g = new Graphics();
@@ -397,11 +413,11 @@ export function MapViewport() {
         layer.addChild(g);
         entitySprites.current.set(entity.id, g);
       }
-      
+
       const color = entityColor(entity.type);
       g.clear();
       g.rect(sx - 3, sy - 3, 6, 6)
-       .fill({ color });
+        .fill({ color });
     }
 
     entitySprites.current.forEach((g, id) => {
@@ -426,7 +442,7 @@ export function MapViewport() {
         const { sx, sy } = worldToScreen(gx * 16, gz * 16, camera, zoom, W, H);
         if (sx < -gridSize || sx > W + gridSize || sy < -gridSize || sy > H + gridSize) continue;
         g.rect(sx, sy, gridSize, gridSize)
-         .stroke({ color: 0x1e293b, width: 0.5, alpha: 0.3 });
+          .stroke({ color: 0x1e293b, width: 0.5, alpha: 0.3 });
       }
     }
 
@@ -440,8 +456,8 @@ export function MapViewport() {
       const shade = Math.round(15 + cost * 8);
       const color = (shade << 16) | (shade << 8) | (shade + 5);
       g.rect(sx, sy, size, size)
-       .fill({ color })
-       .stroke({ color: 0x1e293b, width: 0.5, alpha: 0.5 });
+        .fill({ color })
+        .stroke({ color: 0x1e293b, width: 0.5, alpha: 0.5 });
     }
 
 
@@ -482,8 +498,12 @@ export function MapViewport() {
     cs.forEach((tracked, id) => {
       const { sx, sy } = worldToScreen(tracked.current.x, tracked.current.z, cameraRef.current, newZoom, W, H);
       citizenTargets.current.set(id, { sx, sy });
+
+      // Update glyph to resize vision circle on zoom
+      const sprite = citizenSprites.current.get(id);
+      if (sprite) updateCitizenSprite(sprite, tracked.current, id === selectedId);
     });
-  }, [updateViewportBounds]);
+  }, [updateViewportBounds, selectedId]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -526,7 +546,6 @@ export function MapViewport() {
   }, []);
 
   // ── Follow selected citizen ──────────────────────────────────
-  const selectedId = useCitizenStore(s => s.selectedCitizenId);
   useEffect(() => {
     if (!selectedId) return;
     const citizen = useWorldStore.getState().citizens.get(selectedId);
@@ -560,7 +579,7 @@ export function MapViewport() {
         onMouseLeave={handleMouseUp}
       />
       {hoveredInfo && (
-        <div 
+        <div
           className="absolute pointer-events-none z-50 glass px-2 py-1 text-xs rounded shadow-lg text-slate-200"
           style={{ left: hoveredInfo.x + 10, top: hoveredInfo.y + 10 }}
         >
