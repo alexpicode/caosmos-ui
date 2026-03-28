@@ -191,7 +191,7 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
         <div>
           <h4 className="text-slate-500 text-xs uppercase mb-2">Thought History</h4>
           <div className="flex flex-col gap-2">
-            {cognitionHistory.slice(0, 8).map((entry: CognitionEntry, i: number) => (
+            {cognitionHistory.slice(-8).reverse().map((entry: CognitionEntry, i: number) => (
               <CognitionEntryCard key={i} entry={entry} />
             ))}
           </div>
