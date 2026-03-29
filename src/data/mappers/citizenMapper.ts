@@ -148,6 +148,7 @@ export function mapCitizenDetail(raw: Raw): CitizenDetail {
     perception: mapPerception(raw?.perception),
     currentAction: mapLastAction(raw?.currentAction),
     biometrics,
+    visitedZoneIds: arr<string>(raw?.visitedZoneIds),
   };
 }
 

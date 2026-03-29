@@ -130,6 +130,7 @@ export interface CitizenDetail {
   perception: CitizenPerception;
   currentAction: LastAction | null;
   biometrics: BiometricsEntry[];
+  visitedZoneIds: string[];
 }
 
 export interface CognitionEntry {

@@ -43,6 +43,50 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
+function KnownPlacesList({ places }: { places: string[] }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  if (places.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full text-slate-500 text-xs uppercase hover:text-slate-300 transition-colors group"
+      >
+        <div className="flex items-center gap-2">
+          <span>Known Places</span>
+          <span className="badge badge-idle text-[10px] leading-none px-1.5 opacity-60">
+            {places.length}
+          </span>
+        </div>
+        <span className={`text-[10px] transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}>
+          ▶
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="flex flex-wrap gap-1.5 animate-fade-in pl-1 border-l border-slate-800 ml-1 mt-1">
+          {places.map((place) => (
+            <span
+              key={place}
+              className="px-2 py-0.5 rounded text-[10px] font-medium tracking-wide uppercase"
+              style={{
+                background: 'rgba(30,41,59,0.5)',
+                color: '#94a3b8',
+                border: '1px solid rgba(100,116,139,0.15)',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
+              {place.replace(/_/g, ' ')}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: string }) {
   const cognition = useCognitionPolling(uuid);
   const cognitionHistory = useCitizenStore(s => s.cognitionHistory);
@@ -123,6 +167,9 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
           <MiniSparkline data={biometricEnergy} color="#3b82f6" />
         </div>
       )}
+
+      {/* Known Places (Collapsible) */}
+      <KnownPlacesList places={detail.visitedZoneIds} />
 
       {/* Active Task */}
       {activeTask && (
