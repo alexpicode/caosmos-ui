@@ -142,6 +142,9 @@ export function mapCitizenDetail(raw: Raw): CitizenDetail {
 
   return {
     manifestId: str(raw?.manifest_id, ''),
+    config: raw?.config ? {
+      walkingSpeed: num(raw.config.walkingSpeed, 1.4)
+    } : undefined,
     perception: mapPerception(raw?.perception),
     currentAction: mapLastAction(raw?.currentAction),
     biometrics,

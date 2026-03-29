@@ -35,6 +35,7 @@ export interface CitizenSummary {
   state: string;
   currentGoal: string;
   vitality: number;
+  walkingSpeed?: number;
 }
 
 export interface CitizenInMap {
@@ -119,8 +120,13 @@ export interface BiometricsEntry {
   energy: number;
 }
 
+export interface CitizenConfig {
+  walkingSpeed: number;
+}
+
 export interface CitizenDetail {
   manifestId: string;
+  config?: CitizenConfig;
   perception: CitizenPerception;
   currentAction: LastAction | null;
   biometrics: BiometricsEntry[];

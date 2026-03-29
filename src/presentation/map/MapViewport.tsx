@@ -73,7 +73,17 @@ export function MapViewport() {
 
   // Sprite maps
   const citizenSprites = useRef<Map<string, Container>>(new Map());
-  const citizenTargets = useRef<Map<string, { sx: number; sy: number }>>(new Map());
+  const citizenInterp = useRef<Map<string, {
+    startX: number;
+    startZ: number;
+    currentX: number;
+    currentZ: number;
+    targetX: number;
+    targetZ: number;
+    startTime: number;
+    duration: number;
+    speed: number;
+  }>>(new Map());
   const entitySprites = useRef<Map<string, Graphics>>(new Map());
 
   // Tooltip overlay state
@@ -88,6 +98,7 @@ export function MapViewport() {
   const setZoomLevel = useUIStore(s => s.setZoomLevel);
   const selectCitizen = useCitizenStore(s => s.selectCitizen);
   const selectedId = useCitizenStore(s => s.selectedCitizenId);
+  const citizenDetail = useCitizenStore(s => s.citizenDetail);
 
   const citizens = useWorldStore(s => s.citizens);
   const zones = useWorldStore(s => s.zones);
@@ -180,7 +191,7 @@ export function MapViewport() {
       }
       appRef.current = null;
       citizenSprites.current.clear();
-      citizenTargets.current.clear();
+      citizenInterp.current.clear();
     };
   }, []); // intentionally empty — runs once
 
@@ -272,8 +283,43 @@ export function MapViewport() {
         citizenSprites.current.set(c.uuid, sprite);
       }
 
-      // Update target position for lerp
-      citizenTargets.current.set(c.uuid, { sx, sy });
+      // Update interpolation target
+      const interp = citizenInterp.current.get(c.uuid);
+      const speed = (c.uuid === selectedId && citizenDetail?.config?.walkingSpeed)
+        ? citizenDetail.config.walkingSpeed
+        : c.walkingSpeed;
+
+      if (!interp) {
+        citizenInterp.current.set(c.uuid, {
+          startX: c.x,
+          startZ: c.z,
+          currentX: c.x,
+          currentZ: c.z,
+          targetX: c.x,
+          targetZ: c.z,
+          startTime: Date.now(),
+          duration: 0,
+          speed: speed || 0
+        });
+      } else if (speed) {
+        // Calculate transition from CURRENT interpolated position to NEW target
+        const dist = Math.sqrt(Math.pow(c.x - interp.currentX, 2) + Math.pow(c.z - interp.currentZ, 2));
+        interp.startX = interp.currentX;
+        interp.startZ = interp.currentZ;
+        interp.targetX = c.x;
+        interp.targetZ = c.z;
+        interp.startTime = Date.now();
+        // duration = (distance / units_per_sec) * 1000ms
+        interp.duration = speed > 0 ? (dist / speed) * 1000 : 0;
+        interp.speed = speed;
+      } else {
+        // No speed provided -> discrete movement (snap)
+        interp.currentX = c.x;
+        interp.currentZ = c.z;
+        interp.targetX = c.x;
+        interp.targetZ = c.z;
+        interp.speed = 0;
+      }
 
       // Update color based on state and selection
       updateCitizenSprite(sprite, c, c.uuid === selectedId);
@@ -284,7 +330,7 @@ export function MapViewport() {
       if (!citizenMap.has(id)) {
         layer.removeChild(sprite);
         citizenSprites.current.delete(id);
-        citizenTargets.current.delete(id);
+        citizenInterp.current.delete(id);
       }
     });
   }
@@ -465,13 +511,34 @@ export function MapViewport() {
   }
 
   // ── Ticker (interpolation) ───────────────────────────────────
-  const lerpFactor = 0.12; // smoothing per frame
-  function tickRender(_app: Application, _W: number, _H: number) {
+  function tickRender(_app: Application, W: number, H: number) {
+    const now = Date.now();
+    const cam = getCam();
+    const zoom = getZoom();
+
     citizenSprites.current.forEach((sprite, id) => {
-      const target = citizenTargets.current.get(id);
-      if (!target) return;
-      sprite.x += (target.sx - sprite.x) * lerpFactor;
-      sprite.y += (target.sy - sprite.y) * lerpFactor;
+      const interp = citizenInterp.current.get(id);
+      if (!interp) return;
+
+      if (interp.speed > 0 && interp.duration > 0) {
+        const elapsed = now - interp.startTime;
+        const t = Math.min(elapsed / interp.duration, 1.1); // Allow slight overshoot for smoothness
+
+        // Linear interpolation in world space: START + (TARGET - START) * t
+        interp.currentX = interp.startX + (interp.targetX - interp.startX) * t;
+        interp.currentZ = interp.startZ + (interp.targetZ - interp.startZ) * t;
+
+        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cam, zoom, W, H);
+        sprite.x = sx;
+        sprite.y = sy;
+      } else {
+        // Discrete update
+        interp.currentX = interp.currentX; // already set in renderCitizens
+        interp.currentZ = interp.currentZ;
+        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cam, zoom, W, H);
+        sprite.x = sx;
+        sprite.y = sy;
+      }
     });
   }
 
@@ -496,11 +563,15 @@ export function MapViewport() {
     // Update all citizen target positions
     const cs = useWorldStore.getState().citizens;
     cs.forEach((tracked, id) => {
-      const { sx, sy } = worldToScreen(tracked.current.x, tracked.current.z, cameraRef.current, newZoom, W, H);
-      citizenTargets.current.set(id, { sx, sy });
+      const sprite = citizenSprites.current.get(id);
+      const interp = citizenInterp.current.get(id);
+      if (sprite && interp) {
+        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, newZoom, W, H);
+        sprite.x = sx;
+        sprite.y = sy;
+      }
 
       // Update glyph to resize vision circle on zoom
-      const sprite = citizenSprites.current.get(id);
       if (sprite) updateCitizenSprite(sprite, tracked.current, id === selectedId);
     });
   }, [updateViewportBounds, selectedId]);
@@ -536,8 +607,13 @@ export function MapViewport() {
 
     // Update citizen positions immediately on pan
     worldState.citizens.forEach((tracked, id) => {
-      const { sx, sy } = worldToScreen(tracked.current.x, tracked.current.z, cameraRef.current, zoomRef.current, W, H);
-      citizenTargets.current.set(id, { sx, sy });
+      const sprite = citizenSprites.current.get(id);
+      const interp = citizenInterp.current.get(id);
+      if (sprite && interp) {
+        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
+        sprite.x = sx;
+        sprite.y = sy;
+      }
     });
   }, [updateViewportBounds]);
 
