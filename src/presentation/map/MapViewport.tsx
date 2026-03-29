@@ -543,7 +543,7 @@ export function MapViewport() {
   }
 
   // ── Mouse events ─────────────────────────────────────────────
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const app = appRef.current;
     if (!app) return;
@@ -575,6 +575,14 @@ export function MapViewport() {
       if (sprite) updateCitizenSprite(sprite, tracked.current, id === selectedId);
     });
   }, [updateViewportBounds, selectedId]);
+
+  // Use native wheel event listener with passive: false to allow preventDefault
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -648,7 +656,6 @@ export function MapViewport() {
         ref={containerRef}
         className="flex-1 relative overflow-hidden"
         style={{ cursor: isDragging.current ? 'grabbing' : 'grab', background: '#020617' }}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
