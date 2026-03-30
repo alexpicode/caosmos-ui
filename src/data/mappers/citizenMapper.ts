@@ -16,8 +16,11 @@ import type {
 } from '@core/entities';
 
 // Helpers for null safety
-const str = (v: unknown, fallback = 'Unknown') =>
-  typeof v === 'string' && v.length > 0 ? v : fallback;
+const str = (v: unknown, fallback = 'Unknown') => {
+  if (v === null || v === undefined) return fallback;
+  const s = String(v).trim();
+  return s.length > 0 ? s : fallback;
+};
 const num = (v: unknown, fallback = 0) =>
   typeof v === 'number' && isFinite(v) ? v : fallback;
 const bool = (v: unknown) => v === true;
@@ -141,7 +144,7 @@ export function mapCitizenDetail(raw: Raw): CitizenDetail {
   }));
 
   return {
-    manifestId: str(raw?.manifest_id, ''),
+    uuid: str(raw?.uuid, ''),
     config: raw?.config ? {
       walkingSpeed: num(raw.config.walkingSpeed, 1.4)
     } : undefined,

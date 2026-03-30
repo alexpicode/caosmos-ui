@@ -125,7 +125,7 @@ export interface CitizenConfig {
 }
 
 export interface CitizenDetail {
-  manifestId: string;
+  uuid: string;
   config?: CitizenConfig;
   perception: CitizenPerception;
   currentAction: LastAction | null;

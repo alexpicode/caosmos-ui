@@ -11,7 +11,7 @@ interface FetchOptions extends RequestInit {
   params?: Record<string, string | number | undefined>;
 }
 
-async function request<T>(path: string, options: FetchOptions = {}): Promise<T> {
+async function request<T>(path: string, options: FetchOptions = {}): Promise<{ data: T; tick: number }> {
   const { params, ...fetchOptions } = options;
 
   const url = new URL(`${BASE_URL}${path}`);
@@ -41,7 +41,8 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
     throw new Error(`HTTP ${response.status}: ${response.statusText} — ${path}`);
   }
 
-  return response.json() as Promise<T>;
+  const data = await response.json() as T;
+  return { data, tick: Number(tick) || 0 };
 }
 
 export const httpClient = {

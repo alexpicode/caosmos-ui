@@ -37,10 +37,9 @@ export function useCitizenPolling() {
       const start = Date.now();
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const raw = await citizenApi.getAll(bounds) as any[];
-        const data = raw.map(mapCitizenSummary);
-        const tick = useWorldStore.getState().serverTick;
-        mergeCitizens(data, tick);
+        const response = await citizenApi.getAll(bounds) as { data: any[], tick: number };
+        const data = response.data.map(mapCitizenSummary);
+        mergeCitizens(data, response.tick);
         pruneHistory(retentionMinutes * 60 * 1000);
         resetFail();
         setStatus(Date.now() - start > 2000 ? 'slow' : 'ok');
@@ -67,10 +66,9 @@ export function useEntityPolling() {
     queryKey: ['entities', bounds],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await worldApi.getEntities(bounds) as any[];
-      const data = raw.map(mapWorldEntitySummary);
-      const tick = useWorldStore.getState().serverTick;
-      mergeEntities(data, tick);
+      const response = await worldApi.getEntities(bounds) as { data: any[], tick: number };
+      const data = response.data.map(mapWorldEntitySummary);
+      mergeEntities(data, response.tick);
       return data;
     },
     refetchInterval: interval,
@@ -86,8 +84,8 @@ export function useChunkPolling() {
     queryKey: ['chunks', bounds],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await worldApi.getChunks(bounds) as any[];
-      const data = raw.map(mapChunkInfo);
+      const response = await worldApi.getChunks(bounds) as { data: any[], tick: number };
+      const data = response.data.map(mapChunkInfo);
       setChunks(data);
       return data;
     },
@@ -103,8 +101,8 @@ export function useZonePolling() {
     queryKey: ['zones'],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await worldApi.getZones() as any[];
-      const data = raw.map(mapZone);
+      const response = await worldApi.getZones() as { data: any[], tick: number };
+      const data = response.data.map(mapZone);
       setZones(data);
       return data;
     },
@@ -120,8 +118,8 @@ export function useEnvironmentPolling() {
     queryKey: ['environment'],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await worldApi.getEnvironment() as any;
-      const data = mapEnvironment(raw);
+      const response = await worldApi.getEnvironment() as { data: any, tick: number };
+      const data = mapEnvironment(response.data);
       setEnvironment(data);
       return data;
     },
@@ -139,9 +137,23 @@ export function useCitizenDetail(uuid: string | null) {
     queryFn: async () => {
       if (!uuid) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await citizenApi.getDetail(uuid) as any;
-      const data = mapCitizenDetail(raw);
+      const response = await citizenApi.getDetail(uuid) as { data: any, tick: number };
+      const data = mapCitizenDetail(response.data);
       setCitizenDetail(data);
+
+      // Cross-sync: push to world store to update map immediately
+      useWorldStore.getState().mergeCitizens([{
+        uuid: data.uuid,
+        name: data.perception.identity.name,
+        x: data.perception.position.x,
+        y: data.perception.position.y,
+        z: data.perception.position.z,
+        state: data.perception.state,
+        currentGoal: data.perception.activeTask?.goal || 'Idle',
+        vitality: data.perception.status.vitality,
+        walkingSpeed: data.config?.walkingSpeed
+      }], response.tick);
+
       return data;
     },
     enabled: !!uuid,
@@ -160,8 +172,8 @@ export function useCognitionPolling(uuid: string | null) {
     queryFn: async () => {
       if (!uuid) return [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await citizenApi.getCognition(uuid, Math.max(0, currentTick - 20)) as any[];
-      const data = raw.map(mapCognitionEntry);
+      const response = await citizenApi.getCognition(uuid, Math.max(0, currentTick - 20)) as { data: any[], tick: number };
+      const data = response.data.map(mapCognitionEntry);
       setCognition(data);
       return data;
     },

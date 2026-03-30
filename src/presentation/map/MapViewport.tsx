@@ -63,6 +63,7 @@ export function MapViewport() {
   const zoomRef = useRef(1.0);
   const isDragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
+  const lastUpdateRef = useRef(0);
 
   // Layer containers
   const terrainLayerRef = useRef<Container | null>(null);
@@ -170,7 +171,7 @@ export function MapViewport() {
         if (w === 0 || h === 0) return;
 
         app.renderer.resize(w, h);
-        updateViewportBounds(w, h);
+        updateViewportBounds(w, h, true);
 
         // Re-render the grid on resize because the background must span the new dimensions
         drawChunkGrid(terrainLayerRef.current!, useWorldStore.getState().chunks, cameraRef.current, zoomRef.current, w, h);
@@ -178,7 +179,7 @@ export function MapViewport() {
       });
       ro.observe(containerRef.current);
 
-      updateViewportBounds(W, H);
+      updateViewportBounds(W, H, true);
     };
 
     initPixi();
@@ -196,7 +197,11 @@ export function MapViewport() {
   }, []); // intentionally empty — runs once
 
   // ── Update viewport bounds for polling ──────────────────────
-  const updateViewportBounds = useCallback((W: number, H: number) => {
+  const updateViewportBounds = useCallback((W: number, H: number, force = false) => {
+    const now = Date.now();
+    if (!force && now - lastUpdateRef.current < 100) return;
+    lastUpdateRef.current = now;
+
     const tl = screenToWorld(0, 0, cameraRef.current, zoomRef.current, W, H);
     const br = screenToWorld(W, H, cameraRef.current, zoomRef.current, W, H);
     setViewportBounds({ minX: tl.x, minZ: tl.z, maxX: br.x, maxZ: br.z });
@@ -265,6 +270,7 @@ export function MapViewport() {
 
     citizenMap.forEach(tracked => {
       const c: CitizenSummary = tracked.current;
+      if (!c.uuid || c.uuid === 'Unknown') return; // Skip invalid IDs
       const { sx, sy } = worldToScreen(c.x, c.z, getCam(), getZoom(), W, H);
 
       let sprite = citizenSprites.current.get(c.uuid);
@@ -554,7 +560,7 @@ export function MapViewport() {
     const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomRef.current * (1 + delta)));
     zoomRef.current = newZoom;
 
-    updateViewportBounds(W, H);
+    updateViewportBounds(W, H, true);
 
     // Re-render layers that depend on zoom
     renderZones(useWorldStore.getState().zones, W, H);
@@ -646,7 +652,7 @@ export function MapViewport() {
     } else {
       const W = app.renderer.width / (window.devicePixelRatio || 1);
       const H = app.renderer.height / (window.devicePixelRatio || 1);
-      updateViewportBounds(W, H);
+      updateViewportBounds(W, H, true);
     }
   }, [selectedId, updateViewportBounds]);
 

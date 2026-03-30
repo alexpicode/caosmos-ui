@@ -67,9 +67,19 @@ export const useWorldStore = create<WorldStoreState>()(
 
     mergeCitizens(data, tick) {
       set(state => {
-        state.currentTick = tick;
+        const isMacro = data.length > 1;
+        if (isMacro && tick < state.currentTick && state.currentTick > 0) return;
+        if (isMacro) state.currentTick = tick;
+
         for (const citizen of data) {
           const id = citizen.uuid;
+          const existing = state.citizens.get(id);
+
+          // Individual tick check: don't regress a specific entity
+          if (existing && tick < (existing.history[existing.history.length - 1]?.tick || 0)) {
+            continue;
+          }
+
           const entry: HistoryEntry = {
             tick,
             clientTimestamp: Date.now(),
@@ -79,10 +89,8 @@ export const useWorldStore = create<WorldStoreState>()(
             state: citizen.state,
           };
 
-          const existing = state.citizens.get(id);
           if (existing) {
             existing.history.push(entry);
-            // Downsample if too large
             if (existing.history.length > MAX_HISTORY_POINTS) {
               existing.history = downsample(existing.history);
             }
@@ -102,15 +110,24 @@ export const useWorldStore = create<WorldStoreState>()(
 
     mergeEntities(data, tick) {
       set(state => {
+        const isMacro = data.length > 1;
+        if (isMacro && tick < state.currentTick && state.currentTick > 0) return;
+        if (isMacro) state.currentTick = tick;
+
         for (const entity of data) {
           const id = entity.id;
+          const existing = state.entities.get(id);
+
+          if (existing && tick < (existing.history[existing.history.length - 1]?.tick || 0)) {
+            continue;
+          }
+
           const entry: HistoryEntry = {
             tick,
             clientTimestamp: Date.now(),
             position: { x: entity.x, z: entity.z },
           };
 
-          const existing = state.entities.get(id);
           if (existing) {
             existing.history.push(entry);
             if (existing.history.length > MAX_HISTORY_POINTS) {
