@@ -3,6 +3,7 @@ import { Container, Graphics } from 'pixi.js';
 import { useWorldStore } from '@store/useWorldStore';
 import { useCitizenStore } from '@store/useCitizenStore';
 import { useUIStore } from '@store/useUIStore';
+import { useConfigStore } from '@store/useConfigStore';
 
 import { 
   DEFAULT_WALKING_SPEED 
@@ -37,7 +38,8 @@ export function MapViewport() {
     targetZ: number;
     startTime: number;
     duration: number;
-    speed: number;
+    lastTick: number;
+    isIdle: boolean;
   }>>(new Map());
   const trailSprites = useRef<Map<string, Graphics>>(new Map());
   const entitySprites = useRef<Map<string, Graphics>>(new Map());
@@ -56,6 +58,8 @@ export function MapViewport() {
   const zones = useWorldStore(s => s.zones);
   const chunks = useWorldStore(s => s.chunks);
   const entities = useWorldStore(s => s.entities);
+  const pollingInterval = useConfigStore(s => s.pollingFocusMs);
+  const viewportBounds = useUIStore(s => s.viewportBounds);
 
   const cameraRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1.0);
@@ -115,19 +119,37 @@ export function MapViewport() {
       const H = app.renderer.height / (window.devicePixelRatio || 1);
       const now = Date.now();
 
+      const bounds = useUIStore.getState().viewportBounds;
+      const margin = 5; // Extra padding for culling
+
       citizenSprites.current.forEach((sprite, id) => {
         const interp = citizenInterp.current.get(id);
         if (!interp) return;
 
-        if (interp.speed > 0 && interp.duration > 0) {
+        // Viewport Culling: Skip if far outside the view
+        const isFar = interp.currentX < bounds.minX - margin || interp.currentX > bounds.maxX + margin ||
+                      interp.currentZ < bounds.minZ - margin || interp.currentZ > bounds.maxZ + margin;
+        
+        if (isFar) {
+          sprite.visible = false;
+          return;
+        }
+        sprite.visible = true;
+
+        if (!interp.isIdle && interp.duration > 0) {
           const elapsed = now - interp.startTime;
-          const t = Math.min(elapsed / interp.duration, 1.1);
+          const t = Math.min(elapsed / interp.duration, 1.0);
+          
           interp.currentX = interp.startX + (interp.targetX - interp.startX) * t;
           interp.currentZ = interp.startZ + (interp.targetZ - interp.startZ) * t;
+          
           const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
           sprite.x = sx;
           sprite.y = sy;
         } else {
+          // Snap to target if idle or duration is zero
+          interp.currentX = interp.targetX;
+          interp.currentZ = interp.targetZ;
           const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
           sprite.x = sx;
           sprite.y = sy;
@@ -198,27 +220,31 @@ export function MapViewport() {
       }
 
       const interp = citizenInterp.current.get(c.uuid);
-      const speed = (c.uuid === selectedId && citizenDetail?.config?.walkingSpeed)
-        ? citizenDetail.config.walkingSpeed
-        : (c.walkingSpeed || DEFAULT_WALKING_SPEED);
+      const latestEntry = tracked.history[tracked.history.length - 1];
+      const tick = latestEntry?.tick || 0;
+      const isIdle = c.state === 'IDLE';
 
       if (!interp) {
         citizenInterp.current.set(c.uuid, {
           startX: c.x, startZ: c.z, currentX: c.x, currentZ: c.z, targetX: c.x, targetZ: c.z,
-          startTime: Date.now(), duration: 0, speed: speed || 0
+          startTime: Date.now(), duration: 0, lastTick: tick, isIdle
         });
       } else {
-        // If target changed, update interpolation
-        if (interp.targetX !== c.x || interp.targetZ !== c.z) {
-          const dist = Math.sqrt(Math.pow(c.x - interp.currentX, 2) + Math.pow(c.z - interp.currentZ, 2));
+        // Anti-Jitter: ignore old ticks
+        if (tick <= interp.lastTick && interp.lastTick !== 0) return;
+
+        // If target changed or state changed, update interpolation
+        if (interp.targetX !== c.x || interp.targetZ !== c.z || interp.isIdle !== isIdle) {
           interp.startX = interp.currentX;
           interp.startZ = interp.currentZ;
           interp.targetX = c.x;
           interp.targetZ = c.z;
           interp.startTime = Date.now();
-          // Add a small buffer to duration to avoid snapping at the end
-          interp.duration = speed > 0 ? (dist / speed) * 1050 : 0;
-          interp.speed = speed;
+          interp.lastTick = tick;
+          interp.isIdle = isIdle;
+          
+          // Fixed duration interpolation: polling period + buffer
+          interp.duration = isIdle ? 0 : pollingInterval + 50;
         }
       }
 
@@ -232,7 +258,7 @@ export function MapViewport() {
         citizenInterp.current.delete(id);
       }
     });
-  }, [isReady, citizens, selectedId, citizenDetail, selectCitizen, layers.citizens, zoomRef]);
+  }, [isReady, citizens, selectedId, citizenDetail, selectCitizen, layers.citizens, zoomRef, pollingInterval]);
 
   useEffect(() => {
     if (!appRef.current || !layers.zones.current) return;

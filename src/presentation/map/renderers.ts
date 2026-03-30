@@ -21,7 +21,8 @@ export interface CitizenInterp {
   targetZ: number;
   startTime: number;
   duration: number;
-  speed: number;
+  lastTick: number;
+  isIdle: boolean;
 }
 
 export interface HistoryPoint {
