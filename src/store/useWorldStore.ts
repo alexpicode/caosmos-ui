@@ -180,14 +180,18 @@ export const useWorldStore = create<WorldStoreState>()(
 
     getCitizensInBounds(bounds) {
       const { citizens } = get();
-      const result: CitizenSummary[] = [];
+      const resultMap = new Map<string, CitizenSummary>();
+      
       citizens.forEach(tracked => {
-        const { x, z } = tracked.current;
+        const { x, z, uuid } = tracked.current;
+        if (!uuid || uuid === 'Unknown') return;
+        
         if (x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ) {
-          result.push(tracked.current);
+          resultMap.set(uuid, tracked.current);
         }
       });
-      return result;
+      
+      return Array.from(resultMap.values());
     },
   }))
 );

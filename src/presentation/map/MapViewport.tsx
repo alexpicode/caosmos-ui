@@ -1,79 +1,32 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import {
-  Application, Container, Graphics, Text, TextStyle,
-  FederatedPointerEvent, Circle
-} from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 import { useWorldStore } from '@store/useWorldStore';
 import { useCitizenStore } from '@store/useCitizenStore';
 import { useUIStore } from '@store/useUIStore';
-import { vitalityColor } from '@shared/utils/formatters';
-import type { CitizenSummary, ChunkInfo, Zone, WorldEntitySummary } from '@core/entities';
 
-// ─── Constants ──────────────────────────────────────────────
-const CITIZEN_RADIUS = 7;
-const CITIZEN_VISION_RANGE = 30; // visual perception radius in world units
-const MIN_ZOOM = 0.05;
-const MAX_ZOOM = 4.0;
-const WORLD_SCALE = 4; // world units → pixels (1 world unit = 4px)
-const DEFAULT_WALKING_SPEED = 1.4; // visual smoothing fallback if not in API summary
+import { 
+  DEFAULT_WALKING_SPEED 
+} from './MapConstants';
+import { 
+  worldToScreen 
+} from './MapUtils';
+import {
+  createCitizenSprite,
+  updateCitizenSprite,
+  drawCitizenGlyph,
+  renderZones,
+  renderEntities,
+  drawChunkGrid,
+  renderTrails
+} from './renderers';
+import { useMapApp } from './hooks/useMapApp';
+import { useMapInteraction } from './hooks/useMapInteraction';
 
-// State colours for citizen sprites
-function citizenColor(state: string): number {
-  switch (state.toUpperCase()) {
-    case 'WORKING': return 0x10b981;
-    case 'MOVING': return 0x3b82f6;
-    case 'EATING': return 0xf59e0b;
-    case 'IDLE':
-    default: return 0x06b6d4;
-  }
-}
-
-// Entity type colours
-function entityColor(type: string): number {
-  switch (type.toUpperCase()) {
-    case 'TREE': return 0x15803d;
-    case 'ROCK': return 0x78716c;
-    case 'BUILDING': return 0x7c3aed;
-    default: return 0x475569;
-  }
-}
-
-// World coords → screen pixels
-function worldToScreen(x: number, z: number, camera: { x: number; y: number }, zoom: number, W: number, H: number) {
-  return {
-    sx: (x * WORLD_SCALE - camera.x) * zoom + W / 2,
-    sy: (-z * WORLD_SCALE - camera.y) * zoom + H / 2,
-  };
-}
-
-// Screen pixels → world coords
-function screenToWorld(sx: number, sy: number, camera: { x: number; y: number }, zoom: number, W: number, H: number) {
-  return {
-    x: ((sx - W / 2) / zoom + camera.x) / WORLD_SCALE,
-    z: -((sy - H / 2) / zoom + camera.y) / WORLD_SCALE,
-  };
-}
-
-// ─── Main Component ──────────────────────────────────────────
 export function MapViewport() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const appRef = useRef<Application | null>(null);
+  const { appRef, layers, isReady } = useMapApp(containerRef);
 
-  // Camera state (not in Zustand — local render state)
-  const cameraRef = useRef({ x: 0, y: 0 });
-  const zoomRef = useRef(1.0);
-  const isDragging = useRef(false);
-  const lastMouse = useRef({ x: 0, y: 0 });
-  const lastUpdateRef = useRef(0);
-
-  // Layer containers
-  const terrainLayerRef = useRef<Container | null>(null);
-  const zoneLayerRef = useRef<Container | null>(null);
-  const entityLayerRef = useRef<Container | null>(null);
-  const trailLayerRef = useRef<Container | null>(null);
-  const citizenLayerRef = useRef<Container | null>(null);
-
-  // Sprite maps
+  // Sprite and interpolation state
   const citizenSprites = useRef<Map<string, Container>>(new Map());
   const citizenInterp = useRef<Map<string, {
     startX: number;
@@ -88,17 +41,13 @@ export function MapViewport() {
   }>>(new Map());
   const trailSprites = useRef<Map<string, Graphics>>(new Map());
   const entitySprites = useRef<Map<string, Graphics>>(new Map());
+  const zoneSprites = useRef<Map<string, { g: Graphics; label: any }>>(new Map());
 
   // Tooltip overlay state
   const [hoveredInfo, setHoveredInfo] = React.useState<{ text: string; x: number; y: number } | null>(null);
 
   // Store access
   const visibleLayers = useUIStore(s => s.visibleLayers);
-  const visibleLayersRef = useRef(visibleLayers);
-  visibleLayersRef.current = visibleLayers;
-
-  const setViewportBounds = useUIStore(s => s.setViewportBounds);
-  const setZoomLevel = useUIStore(s => s.setZoomLevel);
   const selectCitizen = useCitizenStore(s => s.selectCitizen);
   const selectedId = useCitizenStore(s => s.selectedCitizenId);
   const citizenDetail = useCitizenStore(s => s.citizenDetail);
@@ -108,195 +57,146 @@ export function MapViewport() {
   const chunks = useWorldStore(s => s.chunks);
   const entities = useWorldStore(s => s.entities);
 
-  // ── Initialize PixiJS ─────────────────────────────────────
+  const cameraRef = useRef({ x: 0, y: 0 });
+  const zoomRef = useRef(1.0);
+  const selectedIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    let isDestroyed = false;
-    let fallbackApp: Application | null = null;
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
-    const initPixi = async () => {
-      if (!containerRef.current) return;
-      const W = containerRef.current.clientWidth;
-      const H = containerRef.current.clientHeight;
-
-      const app = new Application();
-      fallbackApp = app;
-
-      await app.init({
-        width: W || 800,
-        height: H || 600,
-        backgroundColor: 0x020617,
-        antialias: true,
-        resolution: window.devicePixelRatio || 1,
-        autoDensity: true,
-      });
-
-      if (isDestroyed) {
-        app.destroy(true, { children: true });
-        return;
+  const updateCitizenPositions = useCallback((W: number, H: number) => {
+    citizenSprites.current.forEach((sprite, id) => {
+      const interp = citizenInterp.current.get(id);
+      if (sprite && interp) {
+        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
+        sprite.x = sx;
+        sprite.y = sy;
       }
-
-      appRef.current = app;
-      if (!containerRef.current) return;
-      containerRef.current.appendChild(app.canvas);
-
-      // Setup layers
-      const terrain = new Container();
-      const zones = new Container();
-      const entities = new Container();
-      const trails = new Container();
-      const citizens = new Container();
-
-      app.stage.addChild(terrain, zones, entities, trails, citizens);
-
-      terrainLayerRef.current = terrain;
-      zoneLayerRef.current = zones;
-      entityLayerRef.current = entities;
-      trailLayerRef.current = trails;
-      citizenLayerRef.current = citizens;
-
-      // Draw initial grid
-      drawChunkGrid(terrain, [], cameraRef.current, zoomRef.current, app.canvas.width / app.renderer.resolution, app.canvas.height / app.renderer.resolution);
-
-      // Ticker for interpolation
-      app.ticker.add(() => {
-        const cw = app.canvas.width / app.renderer.resolution;
-        const ch = app.canvas.height / app.renderer.resolution;
-        tickRender(app, cw, ch);
-      });
-
-      // Resize observer
-      const ro = new ResizeObserver(entries => {
-        if (isDestroyed) return;
-        const entry = entries[0];
-        const w = entry.contentRect.width;
-        const h = entry.contentRect.height;
-        if (w === 0 || h === 0) return;
-
-        app.renderer.resize(w, h);
-        updateViewportBounds(w, h, true);
-
-        // Re-render the grid on resize because the background must span the new dimensions
-        drawChunkGrid(terrainLayerRef.current!, useWorldStore.getState().chunks, cameraRef.current, zoomRef.current, w, h);
-        renderZones(useWorldStore.getState().zones, w, h);
-      });
-      ro.observe(containerRef.current);
-
-      updateViewportBounds(W, H, true);
-    };
-
-    initPixi();
-
-    return () => {
-      isDestroyed = true;
-      if (fallbackApp) {
-        // Must catch if destroy throws during mid-initialization
-        try { fallbackApp.destroy(true, { children: true }); } catch (e) { }
+      
+      // Update glyph (vision circle etc)
+      const tracked = citizens.get(id);
+      if (tracked) {
+        const g = sprite.children[0] as Graphics;
+        if (g) drawCitizenGlyph(g, tracked.current, id === selectedId, zoomRef.current);
       }
-      appRef.current = null;
-      citizenSprites.current.clear();
-      citizenInterp.current.clear();
-    };
-  }, []); // intentionally empty — runs once
-
-  // ── Update viewport bounds for polling ──────────────────────
-  const updateViewportBounds = useCallback((W: number, H: number, force = false) => {
-    const now = Date.now();
-    if (!force && now - lastUpdateRef.current < 100) return;
-    lastUpdateRef.current = now;
-
-    const tl = screenToWorld(0, 0, cameraRef.current, zoomRef.current, W, H);
-    const br = screenToWorld(W, H, cameraRef.current, zoomRef.current, W, H);
-    // Since Z is inverted, top-left z (tl.z) will be greater than bottom-right z (br.z)
-    setViewportBounds({
-      minX: Math.min(tl.x, br.x),
-      minZ: Math.min(tl.z, br.z),
-      maxX: Math.max(tl.x, br.x),
-      maxZ: Math.max(tl.z, br.z)
     });
-    setZoomLevel(zoomRef.current);
-  }, [setViewportBounds, setZoomLevel]);
-
-  // ── Reactive: citizens data changed ─────────────────────────
-  useEffect(() => {
-    if (!appRef.current || !citizenLayerRef.current || !trailLayerRef.current) return;
-    const app = appRef.current;
-    const W = app.renderer.width / (window.devicePixelRatio || 1);
-    const H = app.renderer.height / (window.devicePixelRatio || 1);
-
-    renderCitizens(citizens, W, H);
-    // Trails are now updated in tickRender for smooth interpolation
-    // renderTrails(citizens, W, H);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citizens, selectedId]);
 
-  useEffect(() => {
-    if (!appRef.current || !zoneLayerRef.current) return;
+  const onViewChange = useCallback(() => {
+    // Re-render when view changes
     const app = appRef.current;
+    if (!app) return;
     const W = app.renderer.width / (window.devicePixelRatio || 1);
     const H = app.renderer.height / (window.devicePixelRatio || 1);
-    renderZones(zones, W, H);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zones]);
+    
+    if (layers.zones.current) renderZones(layers.zones.current, useWorldStore.getState().zones, zoneSprites.current, cameraRef.current, zoomRef.current, W, H);
+    if (layers.terrain.current) drawChunkGrid(layers.terrain.current, useWorldStore.getState().chunks, cameraRef.current, zoomRef.current, W, H);
+    if (layers.entities.current) renderEntities(layers.entities.current, Array.from(useWorldStore.getState().entities.values()).map(t => t.current), entitySprites.current, cameraRef.current, zoomRef.current, W, H, (text, x, y) => setHoveredInfo({ text, x, y }), () => setHoveredInfo(null));
+    
+    // Update citizen/trail positions immediately on pan/zoom
+    updateCitizenPositions(W, H);
+  }, [isReady, appRef, layers, updateCitizenPositions]);
 
+  // Interaction hook
+  const { 
+    isDragging, 
+    handlers, 
+    updateViewportBounds 
+  } = useMapInteraction(appRef, containerRef, cameraRef, zoomRef, onViewChange);
+
+  // Initial render and data updates
   useEffect(() => {
-    if (!appRef.current || !terrainLayerRef.current) return;
+    if (!isReady || !appRef.current) return;
     const app = appRef.current;
-    const W = app.renderer.width / (window.devicePixelRatio || 1);
-    const H = app.renderer.height / (window.devicePixelRatio || 1);
-    drawChunkGrid(terrainLayerRef.current, chunks, cameraRef.current, zoomRef.current, W, H);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chunks]);
+    
+    const tick = () => {
+      const W = app.renderer.width / (window.devicePixelRatio || 1);
+      const H = app.renderer.height / (window.devicePixelRatio || 1);
+      const now = Date.now();
 
+      citizenSprites.current.forEach((sprite, id) => {
+        const interp = citizenInterp.current.get(id);
+        if (!interp) return;
+
+        if (interp.speed > 0 && interp.duration > 0) {
+          const elapsed = now - interp.startTime;
+          const t = Math.min(elapsed / interp.duration, 1.1);
+          interp.currentX = interp.startX + (interp.targetX - interp.startX) * t;
+          interp.currentZ = interp.startZ + (interp.targetZ - interp.startZ) * t;
+          const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
+          sprite.x = sx;
+          sprite.y = sy;
+        } else {
+          const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
+          sprite.x = sx;
+          sprite.y = sy;
+        }
+      });
+
+      if (layers.trails.current) {
+        renderTrails(
+          layers.trails.current, 
+          useWorldStore.getState().citizens, 
+          trailSprites.current, 
+          citizenInterp.current, 
+          cameraRef.current, 
+          zoomRef.current, 
+          W, H, 
+          visibleLayers.trails,
+          selectedIdRef.current
+        );
+      }
+    };
+
+    app.ticker.add(tick);
+    
+    // Resize observer integration
+    const ro = new ResizeObserver(entries => {
+      const entry = entries[0];
+      const w = entry.contentRect.width;
+      const h = entry.contentRect.height;
+      if (w === 0 || h === 0) return;
+
+      app.renderer.resize(w, h);
+      updateViewportBounds(w, h, true);
+      
+      if (layers.terrain.current) drawChunkGrid(layers.terrain.current, useWorldStore.getState().chunks, cameraRef.current, zoomRef.current, w, h);
+      if (layers.zones.current) renderZones(layers.zones.current, useWorldStore.getState().zones, zoneSprites.current, cameraRef.current, zoomRef.current, w, h);
+    });
+    
+    if (containerRef.current) ro.observe(containerRef.current);
+
+    return () => {
+      app.ticker.remove(tick);
+      ro.disconnect();
+    };
+  }, [isReady, appRef, layers, updateViewportBounds, cameraRef, zoomRef, visibleLayers.trails]);
+
+  // Reactive data updates
   useEffect(() => {
-    if (!appRef.current || !entityLayerRef.current) return;
-    const app = appRef.current;
-    const W = app.renderer.width / (window.devicePixelRatio || 1);
-    const H = app.renderer.height / (window.devicePixelRatio || 1);
-    renderEntities(Array.from(entities.values()).map(t => t.current), W, H);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entities]);
+    if (!appRef.current || !layers.citizens.current) return;
+    const W = appRef.current.renderer.width / (window.devicePixelRatio || 1);
+    const H = appRef.current.renderer.height / (window.devicePixelRatio || 1);
 
-  // Sync layer visibility
-  useEffect(() => {
-    if (!appRef.current) return;
-    if (terrainLayerRef.current) terrainLayerRef.current.visible = visibleLayers.terrain;
-    if (zoneLayerRef.current) zoneLayerRef.current.visible = visibleLayers.zones;
-    if (entityLayerRef.current) entityLayerRef.current.visible = visibleLayers.entities;
-    if (citizenLayerRef.current) citizenLayerRef.current.visible = visibleLayers.citizens;
-    if (trailLayerRef.current) trailLayerRef.current.visible = visibleLayers.trails;
-  }, [visibleLayers]);
-
-  // ── Render functions ─────────────────────────────────────────
-
-  function getCam(): { x: number; y: number } { return cameraRef.current; }
-  function getZoom(): number { return zoomRef.current; }
-
-  function renderCitizens(citizenMap: typeof citizens, W: number, H: number) {
-    if (!citizenLayerRef.current) return;
-    const layer = citizenLayerRef.current;
-
-    citizenMap.forEach(tracked => {
-      const c: CitizenSummary = tracked.current;
-      if (!c.uuid || c.uuid === 'Unknown') return; // Skip invalid IDs
-      const { sx, sy } = worldToScreen(c.x, c.z, getCam(), getZoom(), W, H);
+    citizens.forEach(tracked => {
+      const c = tracked.current;
+      if (!c.uuid || c.uuid === 'Unknown') return;
 
       let sprite = citizenSprites.current.get(c.uuid);
       if (!sprite) {
-        // Create new sprite
-        sprite = createCitizenSprite(c);
-        sprite.x = sx;
-        sprite.y = sy;
-        sprite.eventMode = 'static';
-        sprite.cursor = 'pointer';
-        sprite.on('pointerdown', () => selectCitizen(c.uuid));
-        sprite.on('pointerenter', (e) => setHoveredInfo({ text: c.name, x: e.client.x, y: e.client.y }));
-        sprite.on('pointermove', (e) => setHoveredInfo(prev => prev ? { ...prev, x: e.client.x, y: e.client.y } : prev));
-        sprite.on('pointerleave', () => setHoveredInfo(null));
-        layer.addChild(sprite);
+        sprite = createCitizenSprite(
+          c, 
+          c.uuid === selectedId, 
+          zoomRef.current, 
+          selectCitizen, 
+          (text, x, y) => setHoveredInfo({ text, x, y }),
+          () => setHoveredInfo(null)
+        );
+        layers.citizens.current?.addChild(sprite);
         citizenSprites.current.set(c.uuid, sprite);
       }
 
-      // Update interpolation target
       const interp = citizenInterp.current.get(c.uuid);
       const speed = (c.uuid === selectedId && citizenDetail?.config?.walkingSpeed)
         ? citizenDetail.config.walkingSpeed
@@ -304,402 +204,65 @@ export function MapViewport() {
 
       if (!interp) {
         citizenInterp.current.set(c.uuid, {
-          startX: c.x,
-          startZ: c.z,
-          currentX: c.x,
-          currentZ: c.z,
-          targetX: c.x,
-          targetZ: c.z,
-          startTime: Date.now(),
-          duration: 0,
-          speed: speed || 0
+          startX: c.x, startZ: c.z, currentX: c.x, currentZ: c.z, targetX: c.x, targetZ: c.z,
+          startTime: Date.now(), duration: 0, speed: speed || 0
         });
-      } else if (speed) {
-        // Calculate transition from CURRENT interpolated position to NEW target
-        const dist = Math.sqrt(Math.pow(c.x - interp.currentX, 2) + Math.pow(c.z - interp.currentZ, 2));
-        interp.startX = interp.currentX;
-        interp.startZ = interp.currentZ;
-        interp.targetX = c.x;
-        interp.targetZ = c.z;
-        interp.startTime = Date.now();
-        // duration = (distance / units_per_sec) * 1000ms
-        interp.duration = speed > 0 ? (dist / speed) * 1000 : 0;
-        interp.speed = speed;
       } else {
-        // No speed provided -> discrete movement (snap)
-        interp.currentX = c.x;
-        interp.currentZ = c.z;
-        interp.targetX = c.x;
-        interp.targetZ = c.z;
-        interp.speed = 0;
+        // If target changed, update interpolation
+        if (interp.targetX !== c.x || interp.targetZ !== c.z) {
+          const dist = Math.sqrt(Math.pow(c.x - interp.currentX, 2) + Math.pow(c.z - interp.currentZ, 2));
+          interp.startX = interp.currentX;
+          interp.startZ = interp.currentZ;
+          interp.targetX = c.x;
+          interp.targetZ = c.z;
+          interp.startTime = Date.now();
+          // Add a small buffer to duration to avoid snapping at the end
+          interp.duration = speed > 0 ? (dist / speed) * 1050 : 0;
+          interp.speed = speed;
+        }
       }
 
-      // Update color based on state and selection
-      updateCitizenSprite(sprite, c, c.uuid === selectedId);
+      updateCitizenSprite(sprite, c, c.uuid === selectedId, zoomRef.current);
     });
 
-    // Remove despawned citizens
     citizenSprites.current.forEach((sprite, id) => {
-      if (!citizenMap.has(id)) {
-        layer.removeChild(sprite);
+      if (!citizens.has(id)) {
+        layers.citizens.current?.removeChild(sprite);
         citizenSprites.current.delete(id);
         citizenInterp.current.delete(id);
       }
     });
-  }
+  }, [isReady, citizens, selectedId, citizenDetail, selectCitizen, layers.citizens, zoomRef]);
 
-  function createCitizenSprite(c: CitizenSummary): Container {
-    const container = new Container();
-    const g = new Graphics();
-    drawCitizenGlyph(g, c, c.uuid === selectedId);
-    container.addChild(g);
-
-    // Limit hit area to the citizen icon itself, ignoring the vision circle
-    container.hitArea = new Circle(0, 0, CITIZEN_RADIUS + 3);
-
-    return container;
-  }
-
-  function drawCitizenGlyph(g: Graphics, c: CitizenSummary, isSelected: boolean) {
-    g.clear();
-    const color = citizenColor(c.state);
-    const vColor = parseInt(vitalityColor(c.vitality).replace('#', '0x'));
-    const zoom = zoomRef.current;
-
-    // Vision range circle (if selected)
-    if (isSelected) {
-      const visionRadius = CITIZEN_VISION_RANGE * WORLD_SCALE * zoom;
-      g.circle(0, 0, visionRadius)
-        .fill({ color: 0x06b6d4, alpha: 0.12 })
-        .stroke({ color: 0x06b6d4, width: 1, alpha: 0.3 });
-    }
-
-    // Outer glow ring (vitality indicator)
-    g.circle(0, 0, CITIZEN_RADIUS + 3)
-      .fill({ color: vColor, alpha: 0.15 });
-
-    // Vitality arc
-    const vPct = c.vitality / 100;
-    if (vPct > 0) {
-      g.arc(0, 0, CITIZEN_RADIUS + 2, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * vPct)
-        .stroke({ color: vColor, width: 2, alpha: 0.8 });
-    }
-
-    // Main body
-    g.circle(0, 0, CITIZEN_RADIUS)
-      .fill({ color });
-
-    // State indicator dot (stress/hunger)
-    if (c.vitality < 35) {
-      g.circle(CITIZEN_RADIUS - 2, -(CITIZEN_RADIUS - 2), 3)
-        .fill({ color: 0xef4444 });
-    }
-  }
-
-  function updateCitizenSprite(container: Container, c: CitizenSummary, isSelected: boolean) {
-    const g = container.children[0] as Graphics;
-    if (g) drawCitizenGlyph(g, c, isSelected);
-  }
-
-  function renderTrails(citizenMap: typeof citizens, W: number, H: number) {
-    if (!trailLayerRef.current) return;
-    const layer = trailLayerRef.current;
-    if (!visibleLayersRef.current.trails) {
-      layer.visible = false;
-      return;
-    }
-    layer.visible = true;
-
-    citizenMap.forEach((tracked, id) => {
-      if (tracked.history.length < 2) return;
-
-      let g = trailSprites.current.get(id);
-      if (!g) {
-        g = new Graphics();
-        layer.addChild(g);
-        trailSprites.current.set(id, g);
-      }
-      g.clear();
-
-      const history = tracked.history.slice(-100);
-      const now = Date.now();
-      const color = citizenColor(tracked.current.state);
-      const interp = citizenInterp.current.get(id);
-
-      // We always draw up to the second-to-last point in history.
-      // The very last segment is always handled by the "growing" logic below,
-      // which draws from the last history point to the current visual position.
-      const segmentsLimit = history.length - 1;
-
-      for (let i = 1; i < segmentsLimit; i++) {
-        const from = history[i - 1];
-        const to = history[i];
-        const age = (now - to.clientTimestamp) / (5 * 60 * 1000);
-        const alpha = Math.max(0.05, 0.6 * (1 - age));
-        const { sx: x1, sy: y1 } = worldToScreen(from.position.x, from.position.z, getCam(), getZoom(), W, H);
-        const { sx: x2, sy: y2 } = worldToScreen(to.position.x, to.position.z, getCam(), getZoom(), W, H);
-        g.moveTo(x1, y1).lineTo(x2, y2).stroke({ color, width: 1.5, alpha });
-      }
-
-      // Draw the "active" segment: from the last confirmed point (history[length-2])
-      // to the current interpolated position of the citizen icon.
-      if (interp && history.length >= 2) {
-        const from = history[history.length - 2];
-        const alpha = 0.6;
-        const { sx: x1, sy: y1 } = worldToScreen(from.position.x, from.position.z, getCam(), getZoom(), W, H);
-        const { sx: x2, sy: y2 } = worldToScreen(interp.currentX, interp.currentZ, getCam(), getZoom(), W, H);
-        g.moveTo(x1, y1).lineTo(x2, y2).stroke({ color, width: 1.5, alpha });
-      }
-    });
-
-    // Remove despawned citizen trails
-    trailSprites.current.forEach((g, id) => {
-      if (!citizenMap.has(id)) {
-        layer.removeChild(g);
-        trailSprites.current.delete(id);
-      }
-    });
-  }
-
-  function renderZones(zoneList: Zone[], W: number, H: number) {
-    if (!zoneLayerRef.current) return;
-    const layer = zoneLayerRef.current;
-    layer.removeChildren();
-
-    const textStyle = new TextStyle({ fontSize: 11, fill: 0x94a3b8, fontFamily: 'Inter, sans-serif' });
-    const interiorTextStyle = new TextStyle({ fontSize: 11, fill: 0xc7d2fe, fontWeight: 'bold', fontFamily: 'Inter, sans-serif' });
-
-    for (const zone of zoneList) {
-      const isInterior = zone.type?.toUpperCase() === 'INTERIOR';
-      const { sx, sy } = worldToScreen(zone.center.x, zone.center.z, getCam(), getZoom(), W, H);
-      const hw = (zone.width * WORLD_SCALE * getZoom()) / 2;
-      const hh = (zone.length * WORLD_SCALE * getZoom()) / 2;
-
-      const g = new Graphics();
-      const color = isInterior ? 0x6366f1 : 0x8b5cf6;
-      const fillColor = isInterior ? 0x1e1b4b : color; // Very dark indigo for interior depth
-      
-      if (isInterior) {
-        // Interior: Darker fill for "shady" depth, sharp border
-        g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
-          .fill({ color: fillColor, alpha: 0.4 }) // More opaque but DARKER color
-          .stroke({ color, width: 1.5, alpha: 0.6, alignment: 1 });
-        
-        // Extra inner line for depth
-        g.rect(sx - hw + 1, sy - hh + 1, Math.max(0, hw * 2 - 2), Math.max(0, hh * 2 - 2))
-          .stroke({ color, width: 1, alpha: 0.15, alignment: 1 });
-      } else {
-        // Exterior: Minimalist, very light
-        g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
-          .fill({ color, alpha: 0.02 })
-          .stroke({ color, width: 1, alpha: 0.2 });
-      }
-
-      const label = new Text({ 
-        text: zone.name, 
-        style: isInterior ? interiorTextStyle : textStyle 
-      });
-      label.x = sx - label.width / 2;
-      label.y = sy - hh - 14;
-
-      layer.addChild(g, label);
-    }
-  }
-
-  function renderEntities(entitiesList: WorldEntitySummary[], W: number, H: number) {
-    if (!entityLayerRef.current) return;
-    const layer = entityLayerRef.current;
-    const seenIds = new Set<string>();
-
-    for (const entity of entitiesList) {
-      seenIds.add(entity.id);
-      const { sx, sy } = worldToScreen(entity.x, entity.z, getCam(), getZoom(), W, H);
-
-      let g = entitySprites.current.get(entity.id);
-      if (!g) {
-        g = new Graphics();
-        g.eventMode = 'static';
-        g.cursor = 'help';
-        g.on('pointerenter', (e) => setHoveredInfo({ text: entity.displayName, x: e.client.x, y: e.client.y }));
-        g.on('pointermove', (e) => setHoveredInfo(prev => prev ? { ...prev, x: e.client.x, y: e.client.y } : prev));
-        g.on('pointerleave', () => setHoveredInfo(null));
-        layer.addChild(g);
-        entitySprites.current.set(entity.id, g);
-      }
-
-      const color = entityColor(entity.type);
-      g.clear();
-      g.rect(sx - 3, sy - 3, 6, 6)
-        .fill({ color });
-    }
-
-    entitySprites.current.forEach((g, id) => {
-      if (!seenIds.has(id)) {
-        layer.removeChild(g);
-        entitySprites.current.delete(id);
-      }
-    });
-  }
-
-  function drawChunkGrid(layer: Container, chunkList: ChunkInfo[], camera: { x: number; y: number }, zoom: number, W: number, H: number) {
-    layer.removeChildren();
-    const g = new Graphics();
-
-    // Draw a background first
-    g.rect(0, 0, W, H).fill({ color: 0x020617 });
-
-    // Draw subtle infinite grid first
-    const gridSize = 16 * WORLD_SCALE * zoom;
-    for (let gx = -50; gx < 50; gx++) {
-      for (let gz = -50; gz < 50; gz++) {
-        // Offset by 1 unit (16 world units) to account for top-left anchor in inverted Z space
-        const { sx, sy } = worldToScreen(gx * 16, (gz + 1) * 16, camera, zoom, W, H);
-        if (sx < -gridSize || sx > W + gridSize || sy < -gridSize || sy > H + gridSize) continue;
-        g.rect(sx, sy, gridSize, gridSize)
-          .stroke({ color: 0x1e293b, width: 0.5, alpha: 0.3 });
-      }
-    }
-
-    // Draw active chunks
-    for (const chunk of chunkList) {
-      const worldX = chunk.gridX * chunk.size;
-      const worldZ = chunk.gridZ * chunk.size;
-      // Anchor sy is top-left, so we use the maximum Z coordinate of the chunk
-      const { sx, sy } = worldToScreen(worldX, worldZ + chunk.size, camera, zoom, W, H);
-      const size = chunk.size * WORLD_SCALE * zoom;
-      const cost = chunk.movementCost;
-      const shade = Math.round(15 + cost * 8);
-      const color = (shade << 16) | (shade << 8) | (shade + 5);
-      g.rect(sx, sy, size, size)
-        .fill({ color })
-        .stroke({ color: 0x1e293b, width: 0.5, alpha: 0.5 });
-    }
-
-
-    layer.addChild(g);
-  }
-
-  // ── Ticker (interpolation) ───────────────────────────────────
-  function tickRender(_app: Application, W: number, H: number) {
-    const now = Date.now();
-    const cam = getCam();
-    const zoom = getZoom();
-
-    citizenSprites.current.forEach((sprite, id) => {
-      const interp = citizenInterp.current.get(id);
-      if (!interp) return;
-
-      if (interp.speed > 0 && interp.duration > 0) {
-        const elapsed = now - interp.startTime;
-        const t = Math.min(elapsed / interp.duration, 1.1); // Allow slight overshoot for smoothness
-
-        // Linear interpolation in world space: START + (TARGET - START) * t
-        interp.currentX = interp.startX + (interp.targetX - interp.startX) * t;
-        interp.currentZ = interp.startZ + (interp.targetZ - interp.startZ) * t;
-
-        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cam, zoom, W, H);
-        sprite.x = sx;
-        sprite.y = sy;
-      } else {
-        // Discrete update (snap)
-        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cam, zoom, W, H);
-        sprite.x = sx;
-        sprite.y = sy;
-      }
-    });
-
-    // Refresh trails every frame to follow interpolation
-    const worldState = useWorldStore.getState();
-    renderTrails(worldState.citizens, W, H);
-  }
-
-  // ── Mouse events ─────────────────────────────────────────────
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const app = appRef.current;
-    if (!app) return;
-    const W = app.renderer.width / (window.devicePixelRatio || 1);
-    const H = app.renderer.height / (window.devicePixelRatio || 1);
-
-    const delta = -e.deltaY * 0.001;
-    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomRef.current * (1 + delta)));
-    zoomRef.current = newZoom;
-
-    updateViewportBounds(W, H, true);
-
-    // Re-render layers that depend on zoom
-    renderZones(useWorldStore.getState().zones, W, H);
-    drawChunkGrid(terrainLayerRef.current!, useWorldStore.getState().chunks, cameraRef.current, newZoom, W, H);
-
-    // Update all citizen target positions
-    const cs = useWorldStore.getState().citizens;
-    cs.forEach((tracked, id) => {
-      const sprite = citizenSprites.current.get(id);
-      const interp = citizenInterp.current.get(id);
-      if (sprite && interp) {
-        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, newZoom, W, H);
-        sprite.x = sx;
-        sprite.y = sy;
-      }
-
-      // Update glyph to resize vision circle on zoom
-      if (sprite) updateCitizenSprite(sprite, tracked.current, id === selectedId);
-    });
-  }, [updateViewportBounds, selectedId]);
-
-  // Use native wheel event listener with passive: false to allow preventDefault
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
+    if (!appRef.current || !layers.zones.current) return;
+    const W = appRef.current.renderer.width / (window.devicePixelRatio || 1);
+    const H = appRef.current.renderer.height / (window.devicePixelRatio || 1);
+    renderZones(layers.zones.current, zones, zoneSprites.current, cameraRef.current, zoomRef.current, W, H);
+  }, [isReady, zones, layers.zones, cameraRef, zoomRef]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    isDragging.current = true;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-  }, []);
+  useEffect(() => {
+    if (!appRef.current || !layers.terrain.current) return;
+    const W = appRef.current.renderer.width / (window.devicePixelRatio || 1);
+    const H = appRef.current.renderer.height / (window.devicePixelRatio || 1);
+    drawChunkGrid(layers.terrain.current, chunks, cameraRef.current, zoomRef.current, W, H);
+  }, [isReady, chunks, layers.terrain, cameraRef, zoomRef]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging.current) return;
-    const dx = e.clientX - lastMouse.current.x;
-    const dy = e.clientY - lastMouse.current.y;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
+  useEffect(() => {
+    if (!appRef.current || !layers.entities.current) return;
+    const W = appRef.current.renderer.width / (window.devicePixelRatio || 1);
+    const H = appRef.current.renderer.height / (window.devicePixelRatio || 1);
+    renderEntities(layers.entities.current, Array.from(entities.values()).map(t => t.current), entitySprites.current, cameraRef.current, zoomRef.current, W, H, (text, x, y) => setHoveredInfo({ text, x, y }), () => setHoveredInfo(null));
+  }, [isReady, entities, layers.entities, cameraRef, zoomRef]);
 
-    cameraRef.current.x -= dx / zoomRef.current;
-    cameraRef.current.y -= dy / zoomRef.current;
-
-    const app = appRef.current;
-    if (!app) return;
-    const W = app.renderer.width / (window.devicePixelRatio || 1);
-    const H = app.renderer.height / (window.devicePixelRatio || 1);
-
-    updateViewportBounds(W, H);
-
-    // Re-render all on camera move
-    const worldState = useWorldStore.getState();
-    renderZones(worldState.zones, W, H);
-    drawChunkGrid(terrainLayerRef.current!, worldState.chunks, cameraRef.current, zoomRef.current, W, H);
-    renderEntities(Array.from(worldState.entities.values()).map(t => t.current), W, H);
-    // renderTrails is now called in tickRender
-    // renderTrails(worldState.citizens, W, H);
-
-    // Update citizen positions immediately on pan
-    worldState.citizens.forEach((tracked, id) => {
-      const sprite = citizenSprites.current.get(id);
-      const interp = citizenInterp.current.get(id);
-      if (sprite && interp) {
-        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
-        sprite.x = sx;
-        sprite.y = sy;
-      }
-    });
-  }, [updateViewportBounds]);
-
-  const handleMouseUp = useCallback(() => {
-    isDragging.current = false;
-  }, []);
+  // Sync layer visibility
+  useEffect(() => {
+    if (layers.terrain.current) layers.terrain.current.visible = visibleLayers.terrain;
+    if (layers.zones.current) layers.zones.current.visible = visibleLayers.zones;
+    if (layers.entities.current) layers.entities.current.visible = visibleLayers.entities;
+    if (layers.citizens.current) layers.citizens.current.visible = visibleLayers.citizens;
+    if (layers.trails.current) layers.trails.current.visible = visibleLayers.trails;
+  }, [visibleLayers, layers]);
 
   return (
     <>
@@ -707,10 +270,7 @@ export function MapViewport() {
         ref={containerRef}
         className="flex-1 relative overflow-hidden"
         style={{ cursor: isDragging.current ? 'grabbing' : 'grab', background: '#020617' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        {...handlers}
       />
       {hoveredInfo && (
         <div

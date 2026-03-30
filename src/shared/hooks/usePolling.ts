@@ -7,6 +7,7 @@ import { citizenApi } from '@data/api/citizenApi';
 import { worldApi } from '@data/api/worldApi';
 import { mapCitizenSummary, mapCitizenDetail, mapCognitionEntry } from '@data/mappers/citizenMapper';
 import { mapWorldEntitySummary, mapChunkInfo, mapZone, mapEnvironment } from '@data/mappers/worldMapper';
+import { useStableBounds } from './useStableBounds';
 
 /** Determine polling interval based on zoom and selection */
 function usePollingInterval(): number {
@@ -21,7 +22,10 @@ function usePollingInterval(): number {
 
 /** Main citizen polling hook (viewport-bounded) */
 export function useCitizenPolling() {
-  const bounds = useUIStore(s => s.viewportBounds);
+  const rawBounds = useUIStore(s => s.viewportBounds);
+  const zoom = useUIStore(s => s.zoomLevel);
+  const { narrow: bounds } = useStableBounds(rawBounds, zoom);
+  
   const mergeCitizens = useWorldStore(s => s.mergeCitizens);
   const { retentionMinutes } = useConfigStore();
   const pruneHistory = useWorldStore(s => s.pruneHistory);
@@ -58,9 +62,13 @@ export function useCitizenPolling() {
 
 /** World entities polling hook */
 export function useEntityPolling() {
-  const bounds = useUIStore(s => s.viewportBounds);
+  const rawBounds = useUIStore(s => s.viewportBounds);
+  const zoom = useUIStore(s => s.zoomLevel);
+  const { wide: bounds } = useStableBounds(rawBounds, zoom);
+  
   const mergeEntities = useWorldStore(s => s.mergeEntities);
-  const interval = usePollingInterval();
+  // Entities update less frequently as requested (10s)
+  const ENTITY_INTERVAL = 10_000;
 
   return useQuery({
     queryKey: ['entities', bounds],
@@ -71,13 +79,15 @@ export function useEntityPolling() {
       mergeEntities(data, response.tick);
       return data;
     },
-    refetchInterval: interval,
+    refetchInterval: ENTITY_INTERVAL,
   });
 }
 
 /** Chunks polling hook — only refetches when bounds change */
 export function useChunkPolling() {
-  const bounds = useUIStore(s => s.viewportBounds);
+  const rawBounds = useUIStore(s => s.viewportBounds);
+  const zoom = useUIStore(s => s.zoomLevel);
+  const { wide: bounds } = useStableBounds(rawBounds, zoom);
   const setChunks = useWorldStore(s => s.setChunks);
 
   return useQuery({
@@ -163,18 +173,25 @@ export function useCitizenDetail(uuid: string | null) {
 
 /** Cognition history for selected citizen */
 export function useCognitionPolling(uuid: string | null) {
-  const setCognition = useCitizenStore(s => s.setCognition);
-  const currentTick = useWorldStore(s => s.currentTick);
+  const appendCognition = useCitizenStore(s => s.appendCognition);
   const { pollingFocusMs } = useConfigStore();
 
   return useQuery({
     queryKey: ['cognition', uuid],
     queryFn: async () => {
       if (!uuid) return [];
+      
+      // Get the latest lastTick directly from store state to avoid closure staleness
+      const lastTick = useCitizenStore.getState().lastCognitionTick;
+      
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await citizenApi.getCognition(uuid, Math.max(0, currentTick - 20)) as { data: any[], tick: number };
+      const response = await citizenApi.getCognition(uuid, lastTick) as { data: any[], tick: number };
       const data = response.data.map(mapCognitionEntry);
-      setCognition(data);
+      
+      // If response.tick is 0 (missing header), fallback to worldStore currentTick
+      const simTick = response.tick || useWorldStore.getState().currentTick;
+      
+      appendCognition(data, simTick);
       return data;
     },
     enabled: !!uuid,
