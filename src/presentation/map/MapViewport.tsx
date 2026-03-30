@@ -15,6 +15,7 @@ const CITIZEN_VISION_RANGE = 30; // visual perception radius in world units
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 4.0;
 const WORLD_SCALE = 4; // world units → pixels (1 world unit = 4px)
+const DEFAULT_WALKING_SPEED = 1.4; // visual smoothing fallback if not in API summary
 
 // State colours for citizen sprites
 function citizenColor(state: string): number {
@@ -41,7 +42,7 @@ function entityColor(type: string): number {
 function worldToScreen(x: number, z: number, camera: { x: number; y: number }, zoom: number, W: number, H: number) {
   return {
     sx: (x * WORLD_SCALE - camera.x) * zoom + W / 2,
-    sy: (z * WORLD_SCALE - camera.y) * zoom + H / 2,
+    sy: (-z * WORLD_SCALE - camera.y) * zoom + H / 2,
   };
 }
 
@@ -49,7 +50,7 @@ function worldToScreen(x: number, z: number, camera: { x: number; y: number }, z
 function screenToWorld(sx: number, sy: number, camera: { x: number; y: number }, zoom: number, W: number, H: number) {
   return {
     x: ((sx - W / 2) / zoom + camera.x) / WORLD_SCALE,
-    z: ((sy - H / 2) / zoom + camera.y) / WORLD_SCALE,
+    z: -((sy - H / 2) / zoom + camera.y) / WORLD_SCALE,
   };
 }
 
@@ -85,6 +86,7 @@ export function MapViewport() {
     duration: number;
     speed: number;
   }>>(new Map());
+  const trailSprites = useRef<Map<string, Graphics>>(new Map());
   const entitySprites = useRef<Map<string, Graphics>>(new Map());
 
   // Tooltip overlay state
@@ -204,7 +206,13 @@ export function MapViewport() {
 
     const tl = screenToWorld(0, 0, cameraRef.current, zoomRef.current, W, H);
     const br = screenToWorld(W, H, cameraRef.current, zoomRef.current, W, H);
-    setViewportBounds({ minX: tl.x, minZ: tl.z, maxX: br.x, maxZ: br.z });
+    // Since Z is inverted, top-left z (tl.z) will be greater than bottom-right z (br.z)
+    setViewportBounds({
+      minX: Math.min(tl.x, br.x),
+      minZ: Math.min(tl.z, br.z),
+      maxX: Math.max(tl.x, br.x),
+      maxZ: Math.max(tl.z, br.z)
+    });
     setZoomLevel(zoomRef.current);
   }, [setViewportBounds, setZoomLevel]);
 
@@ -216,9 +224,8 @@ export function MapViewport() {
     const H = app.renderer.height / (window.devicePixelRatio || 1);
 
     renderCitizens(citizens, W, H);
-    if (visibleLayersRef.current.trails) {
-      renderTrails(citizens, W, H);
-    }
+    // Trails are now updated in tickRender for smooth interpolation
+    // renderTrails(citizens, W, H);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citizens, selectedId]);
 
@@ -293,7 +300,7 @@ export function MapViewport() {
       const interp = citizenInterp.current.get(c.uuid);
       const speed = (c.uuid === selectedId && citizenDetail?.config?.walkingSpeed)
         ? citizenDetail.config.walkingSpeed
-        : c.walkingSpeed;
+        : (c.walkingSpeed || DEFAULT_WALKING_SPEED);
 
       if (!interp) {
         citizenInterp.current.set(c.uuid, {
@@ -397,26 +404,60 @@ export function MapViewport() {
   function renderTrails(citizenMap: typeof citizens, W: number, H: number) {
     if (!trailLayerRef.current) return;
     const layer = trailLayerRef.current;
-    layer.removeChildren();
+    if (!visibleLayersRef.current.trails) {
+      layer.visible = false;
+      return;
+    }
+    layer.visible = true;
 
-    citizenMap.forEach(tracked => {
+    citizenMap.forEach((tracked, id) => {
       if (tracked.history.length < 2) return;
-      const g = new Graphics();
+
+      let g = trailSprites.current.get(id);
+      if (!g) {
+        g = new Graphics();
+        layer.addChild(g);
+        trailSprites.current.set(id, g);
+      }
+      g.clear();
+
       const history = tracked.history.slice(-100);
       const now = Date.now();
+      const color = citizenColor(tracked.current.state);
+      const interp = citizenInterp.current.get(id);
 
-      for (let i = 1; i < history.length; i++) {
+      // We always draw up to the second-to-last point in history.
+      // The very last segment is always handled by the "growing" logic below,
+      // which draws from the last history point to the current visual position.
+      const segmentsLimit = history.length - 1;
+
+      for (let i = 1; i < segmentsLimit; i++) {
         const from = history[i - 1];
         const to = history[i];
-        const age = (now - to.clientTimestamp) / (5 * 60 * 1000); // normalise over 5 min
+        const age = (now - to.clientTimestamp) / (5 * 60 * 1000);
         const alpha = Math.max(0.05, 0.6 * (1 - age));
-        const color = citizenColor(tracked.current.state);
         const { sx: x1, sy: y1 } = worldToScreen(from.position.x, from.position.z, getCam(), getZoom(), W, H);
         const { sx: x2, sy: y2 } = worldToScreen(to.position.x, to.position.z, getCam(), getZoom(), W, H);
         g.moveTo(x1, y1).lineTo(x2, y2).stroke({ color, width: 1.5, alpha });
       }
 
-      layer.addChild(g);
+      // Draw the "active" segment: from the last confirmed point (history[length-2])
+      // to the current interpolated position of the citizen icon.
+      if (interp && history.length >= 2) {
+        const from = history[history.length - 2];
+        const alpha = 0.6;
+        const { sx: x1, sy: y1 } = worldToScreen(from.position.x, from.position.z, getCam(), getZoom(), W, H);
+        const { sx: x2, sy: y2 } = worldToScreen(interp.currentX, interp.currentZ, getCam(), getZoom(), W, H);
+        g.moveTo(x1, y1).lineTo(x2, y2).stroke({ color, width: 1.5, alpha });
+      }
+    });
+
+    // Remove despawned citizen trails
+    trailSprites.current.forEach((g, id) => {
+      if (!citizenMap.has(id)) {
+        layer.removeChild(g);
+        trailSprites.current.delete(id);
+      }
     });
   }
 
@@ -426,18 +467,38 @@ export function MapViewport() {
     layer.removeChildren();
 
     const textStyle = new TextStyle({ fontSize: 11, fill: 0x94a3b8, fontFamily: 'Inter, sans-serif' });
+    const interiorTextStyle = new TextStyle({ fontSize: 11, fill: 0xc7d2fe, fontWeight: 'bold', fontFamily: 'Inter, sans-serif' });
 
     for (const zone of zoneList) {
+      const isInterior = zone.type?.toUpperCase() === 'INTERIOR';
       const { sx, sy } = worldToScreen(zone.center.x, zone.center.z, getCam(), getZoom(), W, H);
       const hw = (zone.width * WORLD_SCALE * getZoom()) / 2;
       const hh = (zone.length * WORLD_SCALE * getZoom()) / 2;
 
       const g = new Graphics();
-      g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
-        .fill({ color: 0x8b5cf6, alpha: 0.06 })
-        .stroke({ color: 0x8b5cf6, width: 1, alpha: 0.4 });
+      const color = isInterior ? 0x6366f1 : 0x8b5cf6;
+      const fillColor = isInterior ? 0x1e1b4b : color; // Very dark indigo for interior depth
+      
+      if (isInterior) {
+        // Interior: Darker fill for "shady" depth, sharp border
+        g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
+          .fill({ color: fillColor, alpha: 0.4 }) // More opaque but DARKER color
+          .stroke({ color, width: 1.5, alpha: 0.6, alignment: 1 });
+        
+        // Extra inner line for depth
+        g.rect(sx - hw + 1, sy - hh + 1, Math.max(0, hw * 2 - 2), Math.max(0, hh * 2 - 2))
+          .stroke({ color, width: 1, alpha: 0.15, alignment: 1 });
+      } else {
+        // Exterior: Minimalist, very light
+        g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
+          .fill({ color, alpha: 0.02 })
+          .stroke({ color, width: 1, alpha: 0.2 });
+      }
 
-      const label = new Text({ text: zone.name, style: textStyle });
+      const label = new Text({ 
+        text: zone.name, 
+        style: isInterior ? interiorTextStyle : textStyle 
+      });
       label.x = sx - label.width / 2;
       label.y = sy - hh - 14;
 
@@ -491,7 +552,8 @@ export function MapViewport() {
     const gridSize = 16 * WORLD_SCALE * zoom;
     for (let gx = -50; gx < 50; gx++) {
       for (let gz = -50; gz < 50; gz++) {
-        const { sx, sy } = worldToScreen(gx * 16, gz * 16, camera, zoom, W, H);
+        // Offset by 1 unit (16 world units) to account for top-left anchor in inverted Z space
+        const { sx, sy } = worldToScreen(gx * 16, (gz + 1) * 16, camera, zoom, W, H);
         if (sx < -gridSize || sx > W + gridSize || sy < -gridSize || sy > H + gridSize) continue;
         g.rect(sx, sy, gridSize, gridSize)
           .stroke({ color: 0x1e293b, width: 0.5, alpha: 0.3 });
@@ -502,7 +564,8 @@ export function MapViewport() {
     for (const chunk of chunkList) {
       const worldX = chunk.gridX * chunk.size;
       const worldZ = chunk.gridZ * chunk.size;
-      const { sx, sy } = worldToScreen(worldX, worldZ, camera, zoom, W, H);
+      // Anchor sy is top-left, so we use the maximum Z coordinate of the chunk
+      const { sx, sy } = worldToScreen(worldX, worldZ + chunk.size, camera, zoom, W, H);
       const size = chunk.size * WORLD_SCALE * zoom;
       const cost = chunk.movementCost;
       const shade = Math.round(15 + cost * 8);
@@ -538,14 +601,16 @@ export function MapViewport() {
         sprite.x = sx;
         sprite.y = sy;
       } else {
-        // Discrete update
-        interp.currentX = interp.currentX; // already set in renderCitizens
-        interp.currentZ = interp.currentZ;
+        // Discrete update (snap)
         const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cam, zoom, W, H);
         sprite.x = sx;
         sprite.y = sy;
       }
     });
+
+    // Refresh trails every frame to follow interpolation
+    const worldState = useWorldStore.getState();
+    renderTrails(worldState.citizens, W, H);
   }
 
   // ── Mouse events ─────────────────────────────────────────────
@@ -617,7 +682,8 @@ export function MapViewport() {
     renderZones(worldState.zones, W, H);
     drawChunkGrid(terrainLayerRef.current!, worldState.chunks, cameraRef.current, zoomRef.current, W, H);
     renderEntities(Array.from(worldState.entities.values()).map(t => t.current), W, H);
-    renderTrails(worldState.citizens, W, H);
+    // renderTrails is now called in tickRender
+    // renderTrails(worldState.citizens, W, H);
 
     // Update citizen positions immediately on pan
     worldState.citizens.forEach((tracked, id) => {
@@ -634,27 +700,6 @@ export function MapViewport() {
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
   }, []);
-
-  // ── Follow selected citizen ──────────────────────────────────
-  useEffect(() => {
-    if (!selectedId) return;
-    const citizen = useWorldStore.getState().citizens.get(selectedId);
-    if (!citizen) return;
-    cameraRef.current = {
-      x: citizen.current.x * WORLD_SCALE,
-      y: citizen.current.z * WORLD_SCALE,
-    };
-    const app = appRef.current;
-    if (!app) {
-      const W = window.innerWidth;
-      const H = window.innerHeight;
-      updateViewportBounds(W, H);
-    } else {
-      const W = app.renderer.width / (window.devicePixelRatio || 1);
-      const H = app.renderer.height / (window.devicePixelRatio || 1);
-      updateViewportBounds(W, H, true);
-    }
-  }, [selectedId, updateViewportBounds]);
 
   return (
     <>
