@@ -1,6 +1,5 @@
 import type {
-  WorldEntitySummary,
-  WorldEntityInMap,
+  WorldObject,
   ChunkInfo,
   Zone,
   WorldEnvironment,
@@ -8,8 +7,7 @@ import type {
 } from '@core/entities';
 
 export interface WorldRepository {
-  getEntities(bounds?: BoundingBox, type?: string): Promise<WorldEntitySummary[]>;
-  getEntitiesForMap(bounds?: BoundingBox, type?: string): Promise<WorldEntityInMap[]>;
+  getWorldObjects(bounds?: BoundingBox, type?: string): Promise<WorldObject[]>;
   getChunks(bounds: BoundingBox): Promise<ChunkInfo[]>;
   getZones(): Promise<Zone[]>;
   getEnvironment(): Promise<WorldEnvironment>;

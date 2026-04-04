@@ -16,7 +16,7 @@ export const useConfigStore = create<ConfigStoreState>()(
   persist(
     (set) => ({
       retentionMinutes: 15,
-      pollingFocusMs: 800,
+      pollingFocusMs: 500,
       pollingMacroMs: 4000,
       ramLimitMB: 256,
 

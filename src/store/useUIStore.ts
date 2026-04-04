@@ -7,7 +7,7 @@ type DrawerState = 'minimized' | 'expanded';
 interface VisibleLayers {
   terrain: boolean;
   zones: boolean;
-  entities: boolean;
+  worldObjects: boolean;
   citizens: boolean;
   trails: boolean;
 }
@@ -43,7 +43,7 @@ export const useUIStore = create<UIStoreState>()((set) => ({
   visibleLayers: {
     terrain: true,
     zones: true,
-    entities: true,
+    worldObjects: true,
     citizens: true,
     trails: true,
   },

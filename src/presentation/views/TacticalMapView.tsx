@@ -1,7 +1,7 @@
 import { MapViewport } from '@presentation/map/MapViewport';
 import {
   useCitizenPolling,
-  useEntityPolling,
+  useWorldObjectPolling,
   useChunkPolling,
   useZonePolling,
   useEnvironmentPolling,
@@ -10,7 +10,7 @@ import {
 export function TacticalMapView() {
   // Activate all polling hooks
   useCitizenPolling();
-  useEntityPolling();
+  useWorldObjectPolling();
   useChunkPolling();
   useZonePolling();
   useEnvironmentPolling();

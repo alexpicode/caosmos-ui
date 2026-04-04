@@ -6,9 +6,6 @@ import { useUIStore } from '@store/useUIStore';
 import { useConfigStore } from '@store/useConfigStore';
 
 import { 
-  DEFAULT_WALKING_SPEED 
-} from './MapConstants';
-import { 
   worldToScreen 
 } from './MapUtils';
 import {
@@ -16,7 +13,7 @@ import {
   updateCitizenSprite,
   drawCitizenGlyph,
   renderZones,
-  renderEntities,
+  renderWorldObjects,
   drawChunkGrid,
   renderTrails
 } from './renderers';
@@ -42,7 +39,7 @@ export function MapViewport() {
     isIdle: boolean;
   }>>(new Map());
   const trailSprites = useRef<Map<string, Graphics>>(new Map());
-  const entitySprites = useRef<Map<string, Graphics>>(new Map());
+  const worldObjectSprites = useRef<Map<string, Graphics>>(new Map());
   const zoneSprites = useRef<Map<string, { g: Graphics; label: any }>>(new Map());
 
   // Tooltip overlay state
@@ -57,9 +54,8 @@ export function MapViewport() {
   const citizens = useWorldStore(s => s.citizens);
   const zones = useWorldStore(s => s.zones);
   const chunks = useWorldStore(s => s.chunks);
-  const entities = useWorldStore(s => s.entities);
+  const worldObjects = useWorldStore(s => s.worldObjects);
   const pollingInterval = useConfigStore(s => s.pollingFocusMs);
-  const viewportBounds = useUIStore(s => s.viewportBounds);
 
   const cameraRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1.0);
@@ -96,7 +92,7 @@ export function MapViewport() {
     
     if (layers.zones.current) renderZones(layers.zones.current, useWorldStore.getState().zones, zoneSprites.current, cameraRef.current, zoomRef.current, W, H);
     if (layers.terrain.current) drawChunkGrid(layers.terrain.current, useWorldStore.getState().chunks, cameraRef.current, zoomRef.current, W, H);
-    if (layers.entities.current) renderEntities(layers.entities.current, Array.from(useWorldStore.getState().entities.values()).map(t => t.current), entitySprites.current, cameraRef.current, zoomRef.current, W, H, (text, x, y) => setHoveredInfo({ text, x, y }), () => setHoveredInfo(null));
+    if (layers.worldObjects.current) renderWorldObjects(layers.worldObjects.current, Array.from(useWorldStore.getState().worldObjects.values()).map(t => t.current), worldObjectSprites.current, cameraRef.current, zoomRef.current, W, H, (text, x, y) => setHoveredInfo({ text, x, y }), () => setHoveredInfo(null));
     
     // Update citizen/trail positions immediately on pan/zoom
     updateCitizenPositions(W, H);
@@ -275,17 +271,17 @@ export function MapViewport() {
   }, [isReady, chunks, layers.terrain, cameraRef, zoomRef]);
 
   useEffect(() => {
-    if (!appRef.current || !layers.entities.current) return;
+    if (!appRef.current || !layers.worldObjects.current) return;
     const W = appRef.current.renderer.width / (window.devicePixelRatio || 1);
     const H = appRef.current.renderer.height / (window.devicePixelRatio || 1);
-    renderEntities(layers.entities.current, Array.from(entities.values()).map(t => t.current), entitySprites.current, cameraRef.current, zoomRef.current, W, H, (text, x, y) => setHoveredInfo({ text, x, y }), () => setHoveredInfo(null));
-  }, [isReady, entities, layers.entities, cameraRef, zoomRef]);
+    renderWorldObjects(layers.worldObjects.current, Array.from(worldObjects.values()).map(t => t.current), worldObjectSprites.current, cameraRef.current, zoomRef.current, W, H, (text, x, y) => setHoveredInfo({ text, x, y }), () => setHoveredInfo(null));
+  }, [isReady, worldObjects, layers.worldObjects, cameraRef, zoomRef]);
 
   // Sync layer visibility
   useEffect(() => {
     if (layers.terrain.current) layers.terrain.current.visible = visibleLayers.terrain;
     if (layers.zones.current) layers.zones.current.visible = visibleLayers.zones;
-    if (layers.entities.current) layers.entities.current.visible = visibleLayers.entities;
+    if (layers.worldObjects.current) layers.worldObjects.current.visible = visibleLayers.worldObjects;
     if (layers.citizens.current) layers.citizens.current.visible = visibleLayers.citizens;
     if (layers.trails.current) layers.trails.current.visible = visibleLayers.trails;
   }, [visibleLayers, layers]);

@@ -5,11 +5,11 @@ import { useConfigStore } from '@store/useConfigStore';
 type Layer = keyof ReturnType<typeof useUIStore.getState>['visibleLayers'];
 
 const LAYERS: { key: Layer; label: string; icon: string }[] = [
-  { key: 'terrain',  label: 'Terrain',   icon: '⛰' },
-  { key: 'zones',    label: 'Zones',     icon: '⬡' },
-  { key: 'entities', label: 'Objects',   icon: '🪵' },
-  { key: 'citizens', label: 'Citizens',  icon: '🫆' },
-  { key: 'trails',   label: 'Trails',    icon: '〰' },
+  { key: 'terrain',      label: 'Terrain',   icon: '⛰' },
+  { key: 'zones',        label: 'Zones',     icon: '⬡' },
+  { key: 'worldObjects', label: 'Objects',   icon: '🪵' },
+  { key: 'citizens',     label: 'Citizens',  icon: '🫆' },
+  { key: 'trails',       label: 'Trails',    icon: '〰' },
 ];
 
 const RETENTION_OPTIONS = [5, 15, 60, 120] as const;

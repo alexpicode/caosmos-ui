@@ -1,5 +1,5 @@
 import { Container, Graphics, Text, TextStyle, Circle } from 'pixi.js';
-import type { CitizenSummary, ChunkInfo, Zone, WorldEntitySummary } from '@core/entities';
+import type { CitizenSummary, ChunkInfo, Zone, WorldObject } from '@core/entities';
 import { 
   WORLD_SCALE, 
   CITIZEN_RADIUS, 
@@ -142,9 +142,6 @@ export function renderZones(
       g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
         .fill({ color: fillColor, alpha: 0.4 })
         .stroke({ color, width: 1.5, alpha: 0.6, alignment: 1 });
-      
-      g.rect(sx - hw + 1, sy - hh + 1, Math.max(0, hw * 2 - 2), Math.max(0, hh * 2 - 2))
-        .stroke({ color, width: 1, alpha: 0.15, alignment: 1 });
     } else {
       g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
         .fill({ color, alpha: 0.02 })
@@ -163,10 +160,10 @@ export function renderZones(
   });
 }
 
-export function renderEntities(
+export function renderWorldObjects(
   layer: Container,
-  entitiesList: WorldEntitySummary[],
-  entitySprites: Map<string, Graphics>,
+  objectsList: WorldObject[],
+  objectSprites: Map<string, Graphics>,
   camera: { x: number; y: number },
   zoom: number,
   W: number,
@@ -176,40 +173,39 @@ export function renderEntities(
 ) {
   const seenIds = new Set<string>();
 
-  for (const entity of entitiesList) {
-    seenIds.add(entity.id);
-    const { sx, sy } = worldToScreen(entity.x, entity.z, camera, zoom, W, H);
+  for (const obj of objectsList) {
+    seenIds.add(obj.id);
+    const { sx, sy } = worldToScreen(obj.x, obj.z, camera, zoom, W, H);
 
-    // Dynamic visibility check
     if (sx < -10 || sx > W + 10 || sy < -10 || sy > H + 10) {
-      const g = entitySprites.get(entity.id);
+      const g = objectSprites.get(obj.id);
       if (g) g.visible = false;
       continue;
     }
 
-    let g = entitySprites.get(entity.id);
+    let g = objectSprites.get(obj.id);
     if (!g) {
       g = new Graphics();
       g.eventMode = 'static';
       g.cursor = 'help';
-      g.on('pointerenter', (e) => onHover(entity.displayName, e.client.x, e.client.y));
-      g.on('pointermove', (e) => onHover(entity.displayName, e.client.x, e.client.y));
+      g.on('pointerenter', (e) => onHover(obj.displayName, e.client.x, e.client.y));
+      g.on('pointermove', (e) => onHover(obj.displayName, e.client.x, e.client.y));
       g.on('pointerleave', () => onLeave());
       layer.addChild(g);
-      entitySprites.set(entity.id, g);
+      objectSprites.set(obj.id, g);
     }
 
-    const color = entityColor(entity.type);
+    const color = entityColor(obj.type);
     g.visible = true;
     g.clear();
     g.rect(sx - 3, sy - 3, 6, 6)
       .fill({ color });
   }
 
-  entitySprites.forEach((g, id) => {
+  objectSprites.forEach((g, id) => {
     if (!seenIds.has(id)) {
       layer.removeChild(g);
-      entitySprites.delete(id);
+      objectSprites.delete(id);
     }
   });
 }
@@ -326,11 +322,7 @@ export function renderTrails(
       const { sx: x1, sy: y1 } = worldToScreen(from.position.x, from.position.z, camera, zoom, W, H);
       const { sx: x2, sy: y2 } = worldToScreen(to.position.x, to.position.z, camera, zoom, W, H);
 
-      // Simple frustum culling for segments
-      if (
-        (x1 < 0 && x2 < 0) || (x1 > W && x2 > W) ||
-        (y1 < 0 && y2 < 0) || (y1 > H && y2 > H)
-      ) continue;
+      if ((x1 < 0 && x2 < 0) || (x1 > W && x2 > W) || (y1 < 0 && y2 < 0) || (y1 > H && y2 > H)) continue;
 
       const alpha = Math.max(0.1, 0.6 * (1 - age / FADE_MS));
       g.moveTo(x1, y1).lineTo(x2, y2).stroke({ color, width: 1.5, alpha });

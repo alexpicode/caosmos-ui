@@ -2,6 +2,7 @@ import { httpClient } from './httpClient';
 import type { BoundingBox } from '@core/entities';
 
 const WORLD_BASE = '/api/v1/world';
+const OBJECTS_BASE = `${WORLD_BASE}/objects`;
 
 function boundsToParams(bounds?: BoundingBox) {
   if (!bounds) return {};
@@ -23,11 +24,8 @@ function requiredBoundsToParams(bounds: BoundingBox) {
 }
 
 export const worldApi = {
-  getEntities: (bounds?: BoundingBox, type?: string) =>
-    httpClient.get(`${WORLD_BASE}/entities`, { ...boundsToParams(bounds), type }),
-
-  getEntitiesForMap: (bounds?: BoundingBox, type?: string) =>
-    httpClient.get(`${WORLD_BASE}/entities/map`, { ...boundsToParams(bounds), type }),
+  getWorldObjects: (bounds?: BoundingBox, type?: string) =>
+    httpClient.get(OBJECTS_BASE, { ...boundsToParams(bounds), type }),
 
   getChunks: (bounds: BoundingBox) =>
     httpClient.get(`${WORLD_BASE}/chunks`, requiredBoundsToParams(bounds)),

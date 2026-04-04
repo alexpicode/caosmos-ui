@@ -6,7 +6,7 @@ import { useConfigStore } from '@store/useConfigStore';
 import { citizenApi } from '@data/api/citizenApi';
 import { worldApi } from '@data/api/worldApi';
 import { mapCitizenSummary, mapCitizenDetail, mapCognitionEntry } from '@data/mappers/citizenMapper';
-import { mapWorldEntitySummary, mapChunkInfo, mapZone, mapEnvironment } from '@data/mappers/worldMapper';
+import { mapWorldObject, mapChunkInfo, mapZone, mapEnvironment } from '@data/mappers/worldMapper';
 import { useStableBounds } from './useStableBounds';
 
 /** Determine polling interval based on zoom and selection */
@@ -60,26 +60,26 @@ export function useCitizenPolling() {
   });
 }
 
-/** World entities polling hook */
-export function useEntityPolling() {
+/** World objects polling hook */
+export function useWorldObjectPolling() {
   const rawBounds = useUIStore(s => s.viewportBounds);
   const zoom = useUIStore(s => s.zoomLevel);
   const { wide: bounds } = useStableBounds(rawBounds, zoom);
   
-  const mergeEntities = useWorldStore(s => s.mergeEntities);
-  // Entities update less frequently as requested (10s)
-  const ENTITY_INTERVAL = 10_000;
+  const mergeWorldObjects = useWorldStore(s => s.mergeWorldObjects);
+  // Objects update less frequently as requested (10s)
+  const OBJECT_INTERVAL = 10_000;
 
   return useQuery({
-    queryKey: ['entities', bounds],
+    queryKey: ['worldObjects', bounds],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await worldApi.getEntities(bounds) as { data: any[], tick: number };
-      const data = response.data.map(mapWorldEntitySummary);
-      mergeEntities(data, response.tick);
+      const response = await worldApi.getWorldObjects(bounds) as { data: any[], tick: number };
+      const data = response.data.map(mapWorldObject);
+      mergeWorldObjects(data, response.tick);
       return data;
     },
-    refetchInterval: ENTITY_INTERVAL,
+    refetchInterval: OBJECT_INTERVAL,
   });
 }
 
@@ -168,6 +168,8 @@ export function useCitizenDetail(uuid: string | null) {
     },
     enabled: !!uuid,
     refetchInterval: pollingFocusMs,
+    refetchOnMount: 'always',
+    refetchIntervalInBackground: true,
   });
 }
 

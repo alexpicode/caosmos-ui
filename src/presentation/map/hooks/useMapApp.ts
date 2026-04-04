@@ -5,7 +5,7 @@ export function useMapApp(containerRef: React.RefObject<HTMLDivElement | null>) 
   const appRef = useRef<Application | null>(null);
   const terrainLayerRef = useRef<Container | null>(null);
   const zoneLayerRef = useRef<Container | null>(null);
-  const entityLayerRef = useRef<Container | null>(null);
+  const worldObjectLayerRef = useRef<Container | null>(null);
   const trailLayerRef = useRef<Container | null>(null);
   const citizenLayerRef = useRef<Container | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -43,15 +43,15 @@ export function useMapApp(containerRef: React.RefObject<HTMLDivElement | null>) 
       // Setup layers
       const terrain = new Container();
       const zones = new Container();
-      const entities = new Container();
+      const worldObjects = new Container();
       const trails = new Container();
       const citizens = new Container();
 
-      app.stage.addChild(terrain, zones, entities, trails, citizens);
+      app.stage.addChild(terrain, zones, worldObjects, trails, citizens);
 
       terrainLayerRef.current = terrain;
       zoneLayerRef.current = zones;
-      entityLayerRef.current = entities;
+      worldObjectLayerRef.current = worldObjects;
       trailLayerRef.current = trails;
       citizenLayerRef.current = citizens;
       
@@ -74,7 +74,7 @@ export function useMapApp(containerRef: React.RefObject<HTMLDivElement | null>) 
     layers: {
       terrain: terrainLayerRef,
       zones: zoneLayerRef,
-      entities: entityLayerRef,
+      worldObjects: worldObjectLayerRef,
       trails: trailLayerRef,
       citizens: citizenLayerRef,
     },

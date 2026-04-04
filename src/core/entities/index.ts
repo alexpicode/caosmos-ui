@@ -98,7 +98,9 @@ export interface LastAction {
 export interface ActiveTask {
   type: string;
   goal: string;
-  target: string;
+  targetId?: string;
+  targetName?: string;
+  targetDescription?: string;
   completed: boolean;
 }
 
@@ -113,12 +115,6 @@ export interface CitizenPerception {
   position: Vector3;
 }
 
-export interface BiometricsEntry {
-  entityId: string;
-  tick: number;
-  vitality: number;
-  energy: number;
-}
 
 export interface CitizenConfig {
   walkingSpeed: number;
@@ -129,7 +125,7 @@ export interface CitizenDetail {
   config?: CitizenConfig;
   perception: CitizenPerception;
   currentAction: LastAction | null;
-  biometrics: BiometricsEntry[];
+  currentZone: string | null;
   visitedZoneIds: string[];
 }
 
@@ -140,7 +136,7 @@ export interface CognitionEntry {
   actionTarget: string;
 }
 
-export interface WorldEntitySummary {
+export interface WorldObject {
   id: string;
   type: string;
   x: number;
@@ -150,7 +146,7 @@ export interface WorldEntitySummary {
   properties: Record<string, unknown>;
 }
 
-export interface WorldEntityInMap {
+export interface WorldObjectInMap {
   id: string;
   type: string;
   position: Vector3;

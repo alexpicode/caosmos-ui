@@ -10,7 +10,6 @@ import type {
   InventoryItem,
   LastAction,
   ActiveTask,
-  BiometricsEntry,
   CognitionEntry,
   Vector3,
 } from '@core/entities';
@@ -104,7 +103,9 @@ function mapActiveTask(raw: Raw): ActiveTask | null {
   return {
     type: str(raw.type, 'NONE'),
     goal: str(raw.goal, ''),
-    target: str(raw.target, ''),
+    targetId: raw.targetId ? str(raw.targetId) : undefined,
+    targetName: raw.targetName ? str(raw.targetName) : undefined,
+    targetDescription: raw.targetDescription ? str(raw.targetDescription) : undefined,
     completed: bool(raw.completed),
   };
 }
@@ -136,13 +137,6 @@ export function mapCitizenSummary(raw: Raw): CitizenSummary {
 }
 
 export function mapCitizenDetail(raw: Raw): CitizenDetail {
-  const biometrics: BiometricsEntry[] = arr<Raw>(raw?.biometrics).map((b: Raw) => ({
-    entityId: str(b?.entityId, ''),
-    tick: num(b?.tick),
-    vitality: num(b?.vitality, 100),
-    energy: num(b?.energy, 100),
-  }));
-
   return {
     uuid: str(raw?.uuid, ''),
     config: raw?.config ? {
@@ -150,7 +144,7 @@ export function mapCitizenDetail(raw: Raw): CitizenDetail {
     } : undefined,
     perception: mapPerception(raw?.perception),
     currentAction: mapLastAction(raw?.currentAction),
-    biometrics,
+    currentZone: str(raw?.currentZone, undefined),
     visitedZoneIds: arr<string>(raw?.visitedZoneIds),
   };
 }

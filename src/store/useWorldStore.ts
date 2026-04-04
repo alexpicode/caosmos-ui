@@ -3,7 +3,7 @@ import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import type {
   CitizenSummary,
-  WorldEntitySummary,
+  WorldObject,
   Zone,
   ChunkInfo,
   WorldEnvironment,
@@ -23,7 +23,7 @@ interface WorldStoreState {
   desynced: boolean;
 
   citizens: Map<string, TrackedEntity<CitizenSummary>>;
-  entities: Map<string, TrackedEntity<WorldEntitySummary>>;
+  worldObjects: Map<string, TrackedEntity<WorldObject>>;
 
   zones: Zone[];
   chunks: ChunkInfo[];
@@ -31,7 +31,7 @@ interface WorldStoreState {
 
   setTick: (tick: number) => void;
   mergeCitizens: (data: CitizenSummary[], tick: number) => void;
-  mergeEntities: (data: WorldEntitySummary[], tick: number) => void;
+  mergeWorldObjects: (data: WorldObject[], tick: number) => void;
   setZones: (zones: Zone[]) => void;
   setChunks: (chunks: ChunkInfo[]) => void;
   setEnvironment: (env: WorldEnvironment) => void;
@@ -52,7 +52,7 @@ export const useWorldStore = create<WorldStoreState>()(
     desynced: false,
 
     citizens: new Map(),
-    entities: new Map(),
+    worldObjects: new Map(),
     zones: [],
     chunks: [],
     environment: null,
@@ -60,7 +60,6 @@ export const useWorldStore = create<WorldStoreState>()(
     setTick(tick) {
       set(state => {
         state.serverTick = tick;
-        // If the most recently polled data is more than 10 ticks ahead of last stored tick
         state.desynced = Math.abs(tick - state.currentTick) > 10 && state.currentTick > 0;
       });
     },
@@ -75,7 +74,6 @@ export const useWorldStore = create<WorldStoreState>()(
           const id = citizen.uuid;
           const existing = state.citizens.get(id);
 
-          // Individual tick check: don't regress a specific entity
           if (existing && tick < (existing.history[existing.history.length - 1]?.tick || 0)) {
             continue;
           }
@@ -108,15 +106,15 @@ export const useWorldStore = create<WorldStoreState>()(
       });
     },
 
-    mergeEntities(data, tick) {
+    mergeWorldObjects(data, tick) {
       set(state => {
         const isMacro = data.length > 1;
         if (isMacro && tick < state.currentTick && state.currentTick > 0) return;
         if (isMacro) state.currentTick = tick;
 
-        for (const entity of data) {
-          const id = entity.id;
-          const existing = state.entities.get(id);
+        for (const obj of data) {
+          const id = obj.id;
+          const existing = state.worldObjects.get(id);
 
           if (existing && tick < (existing.history[existing.history.length - 1]?.tick || 0)) {
             continue;
@@ -125,7 +123,7 @@ export const useWorldStore = create<WorldStoreState>()(
           const entry: HistoryEntry = {
             tick,
             clientTimestamp: Date.now(),
-            position: { x: entity.x, z: entity.z },
+            position: { x: obj.x, z: obj.z },
           };
 
           if (existing) {
@@ -133,14 +131,14 @@ export const useWorldStore = create<WorldStoreState>()(
             if (existing.history.length > MAX_HISTORY_POINTS) {
               existing.history = downsample(existing.history);
             }
-            existing.current = entity;
+            existing.current = obj;
           } else {
-            state.entities.set(id, {
+            state.worldObjects.set(id, {
               id,
-              type: entity.type.toLowerCase(),
-              metadata: { name: entity.displayName },
+              type: obj.type.toLowerCase(),
+              metadata: { name: obj.displayName },
               history: [entry],
-              current: entity,
+              current: obj,
             });
           }
         }
@@ -165,7 +163,7 @@ export const useWorldStore = create<WorldStoreState>()(
         state.citizens.forEach(entity => {
           entity.history = entity.history.filter(h => h.clientTimestamp > cutoff);
         });
-        state.entities.forEach(entity => {
+        state.worldObjects.forEach(entity => {
           entity.history = entity.history.filter(h => h.clientTimestamp > cutoff);
         });
       });
@@ -174,7 +172,7 @@ export const useWorldStore = create<WorldStoreState>()(
     purgeAll() {
       set(state => {
         state.citizens.forEach(entity => { entity.history = []; });
-        state.entities.forEach(entity => { entity.history = []; });
+        state.worldObjects.forEach(entity => { entity.history = []; });
       });
     },
 

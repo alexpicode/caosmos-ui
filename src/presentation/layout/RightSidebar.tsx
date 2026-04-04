@@ -5,9 +5,6 @@ import { useUIStore } from '@store/useUIStore';
 import { useCitizenDetail, useCognitionPolling } from '@shared/hooks/usePolling';
 import { vitalityColor, stateBadgeClass, truncate } from '@shared/utils/formatters';
 import type { CitizenDetail, CognitionEntry, CitizenSummary } from '@core/entities';
-import {
-  LineChart, Line, ResponsiveContainer, Tooltip,
-} from 'recharts';
 
 // ─── Sub-components ──────────────────────────────
 
@@ -23,23 +20,6 @@ function StatBar({ label, value, max = 100, color }: { label: string; value: num
         <div className="stat-bar-fill" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>
-  );
-}
-
-function MiniSparkline({ data, color }: { data: number[]; color: string }) {
-  if (data.length < 2) return null;
-  const chartData = data.map((v, i) => ({ v, i }));
-  return (
-    <ResponsiveContainer width="100%" height={32}>
-      <LineChart data={chartData}>
-        <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} dot={false} />
-        <Tooltip
-          contentStyle={{ background: '#0f172a', border: '1px solid #334155', fontSize: 11 }}
-          labelFormatter={() => ''}
-          formatter={(v: unknown) => [v as number, '']}
-        />
-      </LineChart>
-    </ResponsiveContainer>
   );
 }
 
@@ -95,11 +75,8 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
   const pinnedIds = useCitizenStore(s => s.pinnedCitizenIds);
   const isPinned = pinnedIds.has(uuid);
 
-  const { perception, currentAction, biometrics } = detail;
+  const { perception, currentAction } = detail;
   const { identity, status, state, equipment, inventory, activeTask, lastAction } = perception;
-
-  const biometricVitality = biometrics.slice(-20).map(b => b.vitality);
-  const biometricEnergy = biometrics.slice(-20).map(b => b.energy);
 
   return (
     <div className="flex flex-col gap-3 animate-fade-in">
@@ -149,7 +126,7 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
 
       {/* Status */}
       <div>
-        <h4 className="text-slate-500 text-xs uppercase mb-2">Biometrics</h4>
+        <h4 className="text-slate-500 text-xs uppercase mb-2">Status</h4>
         <div className="flex flex-col gap-2">
           <StatBar label="Vitality" value={status.vitality} color={vitalityColor(status.vitality)} />
           <StatBar label="Energy" value={status.energy} color="#3b82f6" />
@@ -158,13 +135,13 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
         </div>
       </div>
 
-      {/* Biometrics timeline */}
-      {biometricVitality.length > 1 && (
-        <div>
-          <h4 className="text-slate-500 text-xs uppercase mb-1">Vitality Trend</h4>
-          <MiniSparkline data={biometricVitality} color={vitalityColor(status.vitality)} />
-          <h4 className="text-slate-500 text-xs uppercase mb-1 mt-1">Energy Trend</h4>
-          <MiniSparkline data={biometricEnergy} color="#3b82f6" />
+      {/* Current Zone */}
+      {detail.currentZone && (
+        <div className="flex flex-col gap-1.5">
+          <h4 className="text-slate-500 text-xs uppercase">Current Location</h4>
+          <div className="px-3 py-2 rounded-lg border text-xs font-medium text-cyan-400 bg-cyan-400/5 border-cyan-400/20">
+            📍 {detail.currentZone.replace(/_/g, ' ')}
+          </div>
         </div>
       )}
 
@@ -173,13 +150,38 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
 
       {/* Active Task */}
       {activeTask && (
-        <div className="p-2 rounded-lg" style={{ background: 'rgba(30,41,59,0.7)', border: '1px solid rgba(100,116,139,0.2)' }}>
-          <div className="flex justify-between items-center mb-1">
-            <h4 className="text-slate-500 text-xs uppercase">Task</h4>
-            <span className="badge badge-working text-xs">{activeTask.type}</span>
+        <div className="p-2.5 rounded-lg" style={{ background: 'rgba(30,41,59,0.7)', border: '1px solid rgba(100,116,139,0.2)' }}>
+          <div className="flex justify-between items-center mb-1.5">
+            <h4 className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">Active Task</h4>
+            <span className="badge badge-working text-[10px] py-0.5 px-1.5 uppercase font-bold tracking-tight">
+              {activeTask.type}
+            </span>
           </div>
-          <p className="text-slate-300 text-xs">{activeTask.goal}</p>
-          {activeTask.target && <p className="text-slate-500 text-xs">→ {activeTask.target}</p>}
+          <p className="text-slate-200 text-xs font-medium leading-relaxed mb-2">{activeTask.goal}</p>
+          
+          {(activeTask.targetName || activeTask.targetId || activeTask.targetDescription) && (
+            <div className="mt-2 pt-2 border-t border-slate-700/50 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1 h-1 rounded-full bg-cyan-400/60 shadow-[0_0_4px_rgba(34,211,238,0.5)]" />
+                <span className="text-cyan-400/90 text-[10px] font-bold uppercase tracking-widest">Target</span>
+              </div>
+              <div className="flex items-baseline gap-2 pl-2.5">
+                {activeTask.targetName && (
+                  <p className="text-slate-100 text-xs font-semibold">{activeTask.targetName}</p>
+                )}
+                {activeTask.targetId && (
+                  <p className={`font-mono text-[10px] ${activeTask.targetName ? 'text-slate-500' : 'text-slate-300 font-semibold'}`}>
+                    {activeTask.targetName ? `#${activeTask.targetId}` : activeTask.targetId}
+                  </p>
+                )}
+              </div>
+              {activeTask.targetDescription && (
+                <p className="text-slate-400 text-[10px] italic leading-snug pl-2.5 mt-0.5 border-l border-slate-800 ml-0.5">
+                  {activeTask.targetDescription}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -276,8 +278,6 @@ function CognitionEntryCard({ entry }: { entry: CognitionEntry }) {
 function PinnedCard({ citizen }: { citizen: CitizenSummary }) {
   const selectCitizen = useCitizenStore(s => s.selectCitizen);
   const unpinCitizen = useCitizenStore(s => s.unpinCitizen);
-  const tracked = useWorldStore(s => s.citizens.get(citizen.uuid));
-  const vitalHistory = tracked?.history.slice(-15).map(h => h.vitality ?? 100) ?? [];
 
   return (
     <div
@@ -295,7 +295,6 @@ function PinnedCard({ citizen }: { citizen: CitizenSummary }) {
         <span className={`badge text-xs ml-auto ${stateBadgeClass(citizen.state)}`}>{citizen.state}</span>
       </div>
       <p className="text-slate-500 text-xs truncate mb-1.5">{citizen.currentGoal}</p>
-      {vitalHistory.length > 1 && <MiniSparkline data={vitalHistory} color={vitalityColor(citizen.vitality)} />}
     </div>
   );
 }
