@@ -4,7 +4,7 @@ import { useWorldStore } from '@store/useWorldStore';
 import { useUIStore } from '@store/useUIStore';
 import { useCitizenDetail, useCognitionPolling } from '@shared/hooks/usePolling';
 import { vitalityColor, stateBadgeClass, truncate } from '@shared/utils/formatters';
-import type { CitizenDetail, CognitionEntry, CitizenSummary } from '@core/entities';
+import type { CitizenDetail, CognitionEntry, CitizenSummary, SpeechMessage } from '@core/entities';
 
 // ─── Sub-components ──────────────────────────────
 
@@ -63,6 +63,34 @@ function KnownPlacesList({ places }: { places: string[] }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function RecentMessagesList({ messages }: { messages: SpeechMessage[] }) {
+  if (messages.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <h4 className="text-slate-500 text-xs uppercase mb-1">Recent Messages</h4>
+      <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+        {messages.map((msg, idx) => (
+          <div
+            key={`${msg.sourceName}-${idx}`}
+            className="p-2 rounded-lg text-xs border border-slate-700/30 bg-slate-800/40 hover:bg-slate-800/60 transition-colors"
+          >
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-cyan-400 font-bold uppercase text-[9px] tracking-wider">
+                {msg.sourceName} <span className="text-slate-600 px-0.5">→</span> {msg.targetName}
+              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-400 font-medium border border-slate-600/20">
+                {msg.tone}
+              </span>
+            </div>
+            <p className="text-slate-300 leading-relaxed italic text-[11px]">"{msg.message}"</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -224,6 +252,9 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
           </div>
         )}
       </div>
+
+      {/* Recent Messages */}
+      <RecentMessagesList messages={detail.recentMessages} />
 
       {/* LLM Reasoning */}
       {(lastAction?.reasoningWas || currentAction?.reasoningWas) && (

@@ -120,11 +120,19 @@ export interface CitizenConfig {
   walkingSpeed: number;
 }
 
+export interface SpeechMessage {
+  sourceName: string;
+  targetName: string;
+  message: string;
+  tone: string;
+}
+
 export interface CitizenDetail {
   uuid: string;
   config?: CitizenConfig;
   perception: CitizenPerception;
   currentAction: LastAction | null;
+  recentMessages: SpeechMessage[];
   currentZone: string | null;
   visitedZoneIds: string[];
 }

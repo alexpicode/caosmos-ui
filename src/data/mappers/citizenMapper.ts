@@ -12,6 +12,7 @@ import type {
   ActiveTask,
   CognitionEntry,
   Vector3,
+  SpeechMessage,
 } from '@core/entities';
 
 // Helpers for null safety
@@ -136,6 +137,15 @@ export function mapCitizenSummary(raw: Raw): CitizenSummary {
   };
 }
 
+function mapSpeechMessage(raw: Raw): SpeechMessage {
+  return {
+    sourceName: str(raw?.sourceName, 'Unknown'),
+    targetName: str(raw?.targetName, 'Someone'),
+    message: str(raw?.message, ''),
+    tone: str(raw?.tone, 'Neutral'),
+  };
+}
+
 export function mapCitizenDetail(raw: Raw): CitizenDetail {
   return {
     uuid: str(raw?.uuid, ''),
@@ -144,6 +154,7 @@ export function mapCitizenDetail(raw: Raw): CitizenDetail {
     } : undefined,
     perception: mapPerception(raw?.perception),
     currentAction: mapLastAction(raw?.currentAction),
+    recentMessages: arr<Raw>(raw?.recentMessages).map(mapSpeechMessage),
     currentZone: str(raw?.currentZone, undefined),
     visitedZoneIds: arr<string>(raw?.visitedZoneIds),
   };
