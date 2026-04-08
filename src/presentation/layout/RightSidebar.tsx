@@ -74,7 +74,7 @@ function RecentMessagesList({ messages }: { messages: SpeechMessage[] }) {
     <div className="flex flex-col gap-2">
       <h4 className="text-slate-500 text-xs uppercase mb-1">Recent Messages</h4>
       <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
-        {messages.map((msg, idx) => (
+        {messages.slice().reverse().map((msg, idx) => (
           <div
             key={`${msg.sourceName}-${idx}`}
             className="p-2 rounded-lg text-xs border border-slate-700/30 bg-slate-800/40 hover:bg-slate-800/60 transition-colors"
@@ -91,6 +91,39 @@ function RecentMessagesList({ messages }: { messages: SpeechMessage[] }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ThoughtHistoryList({ history }: { history: CognitionEntry[] }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  if (history.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full text-slate-500 text-xs uppercase hover:text-slate-300 transition-colors group"
+      >
+        <div className="flex items-center gap-2">
+          <span>Thought History</span>
+          <span className="badge badge-idle text-[10px] leading-none px-1.5 opacity-60">
+            {history.length}
+          </span>
+        </div>
+        <span className={`text-[10px] transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}>
+          ▶
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="flex flex-col gap-2 animate-fade-in pl-1 border-l border-slate-800 ml-1 mt-1">
+          {history.slice(-8).reverse().map((entry: CognitionEntry, i: number) => (
+            <CognitionEntryCard key={i} entry={entry} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -266,17 +299,8 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
         </div>
       )}
 
-      {/* Cognition Timeline */}
-      {cognitionHistory.length > 0 && (
-        <div>
-          <h4 className="text-slate-500 text-xs uppercase mb-2">Thought History</h4>
-          <div className="flex flex-col gap-2">
-            {cognitionHistory.slice(-8).reverse().map((entry: CognitionEntry, i: number) => (
-              <CognitionEntryCard key={i} entry={entry} />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Cognition Timeline (Collapsible) */}
+      <ThoughtHistoryList history={cognitionHistory} />
 
       {cognition.isFetching && (
         <div className="flex justify-center py-2">
