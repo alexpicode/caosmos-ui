@@ -13,6 +13,7 @@ import type {
   CognitionEntry,
   Vector3,
   SpeechMessage,
+  ExplorationProgress,
 } from '@core/entities';
 
 // Helpers for null safety
@@ -156,7 +157,11 @@ export function mapCitizenDetail(raw: Raw): CitizenDetail {
     currentAction: mapLastAction(raw?.currentAction),
     recentMessages: arr<Raw>(raw?.recentMessages).map(mapSpeechMessage),
     currentZone: str(raw?.currentZone, undefined),
-    visitedZoneIds: arr<string>(raw?.visitedZoneIds),
+    explorationProgress: arr<Raw>(raw?.explorationProgress).map(p => ({
+      name: str(p?.name),
+      percentage: num(p?.percentage)
+    })),
+    coins: num(raw?.coins, 0),
   };
 }
 

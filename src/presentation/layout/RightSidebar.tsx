@@ -4,7 +4,7 @@ import { useWorldStore } from '@store/useWorldStore';
 import { useUIStore } from '@store/useUIStore';
 import { useCitizenDetail, useCognitionPolling } from '@shared/hooks/usePolling';
 import { vitalityColor, stateBadgeClass, truncate } from '@shared/utils/formatters';
-import type { CitizenDetail, CognitionEntry, CitizenSummary, SpeechMessage } from '@core/entities';
+import type { CitizenDetail, CognitionEntry, CitizenSummary, SpeechMessage, ExplorationProgress } from '@core/entities';
 
 // ─── Sub-components ──────────────────────────────
 
@@ -23,10 +23,10 @@ function StatBar({ label, value, max = 100, color }: { label: string; value: num
   );
 }
 
-function KnownPlacesList({ places }: { places: string[] }) {
+function ExplorationProgressList({ progress }: { progress: ExplorationProgress[] }) {
   const [isOpen, setIsOpen] = React.useState(false);
 
-  if (places.length === 0) return null;
+  if (progress.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -35,9 +35,9 @@ function KnownPlacesList({ places }: { places: string[] }) {
         className="flex items-center justify-between w-full text-slate-500 text-xs uppercase hover:text-slate-300 transition-colors group"
       >
         <div className="flex items-center gap-2">
-          <span>Known Places</span>
+          <span>Exploration Progress</span>
           <span className="badge badge-idle text-[10px] leading-none px-1.5 opacity-60">
-            {places.length}
+            {progress.length}
           </span>
         </div>
         <span className={`text-[10px] transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}>
@@ -46,20 +46,30 @@ function KnownPlacesList({ places }: { places: string[] }) {
       </button>
 
       {isOpen && (
-        <div className="flex flex-wrap gap-1.5 animate-fade-in pl-1 border-l border-slate-800 ml-1 mt-1">
-          {places.map((place) => (
-            <span
-              key={place}
-              className="px-2 py-0.5 rounded text-[10px] font-medium tracking-wide uppercase"
+        <div className="flex flex-col gap-1.5 animate-fade-in pl-1 border-l border-slate-800 ml-1 mt-1">
+          {progress.map((item) => (
+            <div
+              key={item.name}
+              className="flex flex-col gap-1 px-2 py-1.5 rounded"
               style={{
                 background: 'rgba(30,41,59,0.5)',
-                color: '#94a3b8',
                 border: '1px solid rgba(100,116,139,0.15)',
                 backdropFilter: 'blur(4px)',
               }}
             >
-              {place.replace(/_/g, ' ')}
-            </span>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="font-medium tracking-wide uppercase text-slate-400">
+                  {item.name.replace(/_/g, ' ')}
+                </span>
+                <span className="font-mono text-cyan-400">{item.percentage}%</span>
+              </div>
+              <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-cyan-500/60 transition-all duration-500" 
+                  style={{ width: `${item.percentage}%` }}
+                />
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -169,6 +179,15 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
         </button>
       </div>
 
+      {/* Economy */}
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
+        <span className="text-lg">🪙</span>
+        <div className="flex flex-col">
+          <span className="text-[10px] text-yellow-500/60 uppercase font-bold tracking-wider leading-none">Coins</span>
+          <span className="text-sm font-mono text-yellow-500 font-bold">{detail.coins.toLocaleString()}</span>
+        </div>
+      </div>
+
       {/* Skills */}
       {Object.entries(identity.skills).length > 0 && (
         <div>
@@ -206,8 +225,8 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
         </div>
       )}
 
-      {/* Known Places (Collapsible) */}
-      <KnownPlacesList places={detail.visitedZoneIds} />
+      {/* Exploration (Collapsible) */}
+      <ExplorationProgressList progress={detail.explorationProgress} />
 
       {/* Active Task */}
       {activeTask && (

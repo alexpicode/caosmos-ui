@@ -127,6 +127,11 @@ export interface SpeechMessage {
   tone: string;
 }
 
+export interface ExplorationProgress {
+  name: string;
+  percentage: number;
+}
+
 export interface CitizenDetail {
   uuid: string;
   config?: CitizenConfig;
@@ -134,7 +139,8 @@ export interface CitizenDetail {
   currentAction: LastAction | null;
   recentMessages: SpeechMessage[];
   currentZone: string | null;
-  visitedZoneIds: string[];
+  explorationProgress: ExplorationProgress[];
+  coins: number;
 }
 
 export interface CognitionEntry {
