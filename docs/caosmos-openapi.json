@@ -1,0 +1,1516 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
+    }
+  ],
+  "paths": {
+    "/api/v1/world/zones": {
+      "get": {
+        "tags": [
+          "world-monitor-controller"
+        ],
+        "summary": "Get all world zones",
+        "operationId": "getAllZones",
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved zones",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ZoneDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/world/zones/{id}": {
+      "get": {
+        "tags": [
+          "world-monitor-controller"
+        ],
+        "summary": "Get zone details",
+        "operationId": "getZoneDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Zone unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved zone details",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Zone not found",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/world/objects": {
+      "get": {
+        "tags": [
+          "world-monitor-controller"
+        ],
+        "summary": "Get world objects summary",
+        "operationId": "getObjects",
+        "parameters": [
+          {
+            "name": "minX",
+            "in": "query",
+            "description": "Minimum X coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "minZ",
+            "in": "query",
+            "description": "Minimum Z coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "maxX",
+            "in": "query",
+            "description": "Maximum X coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "maxZ",
+            "in": "query",
+            "description": "Maximum Z coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "description": "Filter by object name (substring match)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Filter by object category (exact match)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "owned",
+            "in": "query",
+            "description": "Filter by object owner's name (substring match)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved objects summary",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorldEntitySummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/world/objects/{id}": {
+      "get": {
+        "tags": [
+          "world-monitor-controller"
+        ],
+        "summary": "Get object details",
+        "operationId": "getObjectDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Object unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved object details",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorldObjectDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Object not found",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorldObjectDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/world/environment": {
+      "get": {
+        "tags": [
+          "world-monitor-controller"
+        ],
+        "summary": "Get world environment status",
+        "operationId": "getEnvironment",
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved environment status",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorldEnvironmentResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/world/chunks": {
+      "get": {
+        "tags": [
+          "world-monitor-controller"
+        ],
+        "summary": "Get world chunks info",
+        "operationId": "getChunks",
+        "parameters": [
+          {
+            "name": "minX",
+            "in": "query",
+            "description": "Minimum X coordinate",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "minZ",
+            "in": "query",
+            "description": "Minimum Z coordinate",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "maxX",
+            "in": "query",
+            "description": "Maximum X coordinate",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "maxZ",
+            "in": "query",
+            "description": "Maximum Z coordinate",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved chunks info",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChunkInfoDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/citizens": {
+      "get": {
+        "tags": [
+          "citizen-monitor-controller"
+        ],
+        "summary": "Get all citizens summary",
+        "operationId": "getAllCitizens",
+        "parameters": [
+          {
+            "name": "minX",
+            "in": "query",
+            "description": "Minimum X coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "minZ",
+            "in": "query",
+            "description": "Minimum Z coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "maxX",
+            "in": "query",
+            "description": "Maximum X coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "maxZ",
+            "in": "query",
+            "description": "Maximum Z coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "description": "Filter by citizen name (substring match)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved citizens summary",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CitizenSummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/citizens/{uuid}": {
+      "get": {
+        "tags": [
+          "citizen-monitor-controller"
+        ],
+        "summary": "Get citizen details",
+        "operationId": "getCitizenDetail",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "description": "Citizen unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved citizen details",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Citizen not found",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/citizens/{uuid}/cognition": {
+      "get": {
+        "tags": [
+          "citizen-monitor-controller"
+        ],
+        "summary": "Get citizen cognition history",
+        "operationId": "getCognition",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "description": "Citizen unique identifier",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sinceTick",
+            "in": "query",
+            "description": "Fetch cognition history since this tick",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved cognition history",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CitizenCognitionDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/citizens/map": {
+      "get": {
+        "tags": [
+          "citizen-monitor-controller"
+        ],
+        "summary": "Get citizens for map display",
+        "operationId": "getCitizenInMap",
+        "parameters": [
+          {
+            "name": "minX",
+            "in": "query",
+            "description": "Minimum X coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "minZ",
+            "in": "query",
+            "description": "Minimum Z coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "maxX",
+            "in": "query",
+            "description": "Maximum X coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "maxZ",
+            "in": "query",
+            "description": "Maximum Z coordinate",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved citizens for map",
+            "headers": {
+              "X-Sim-Tick": {
+                "description": "Current simulation tick",
+                "style": "simple",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CitizenInMapDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Vector3": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number",
+            "format": "double"
+          },
+          "y": {
+            "type": "number",
+            "format": "double"
+          },
+          "z": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ZoneDto": {
+        "type": "object",
+        "description": "Detailed representation of a world zone",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the zone"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the zone"
+          },
+          "parentZoneId": {
+            "type": "string",
+            "description": "Parent zone identifier if nested"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of the zone (INTERIOR/EXTERIOR)",
+            "enum": [
+              "EXTERIOR",
+              "INTERIOR",
+              "UNKNOWN"
+            ]
+          },
+          "isEntryRestricted": {
+            "type": "boolean",
+            "description": "Whether the zone requires specific entry points"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category of the zone"
+          },
+          "owned": {
+            "type": "string",
+            "description": "Name of the owner, or null if unowned"
+          },
+          "tags": {
+            "type": "array",
+            "description": "Semantic tags associated with the zone",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "center": {
+            "$ref": "#/components/schemas/Vector3",
+            "description": "Center coordinates"
+          },
+          "width": {
+            "type": "number",
+            "format": "double",
+            "description": "Width of the zone (X-axis)"
+          },
+          "length": {
+            "type": "number",
+            "format": "double",
+            "description": "Length of the zone (Z-axis)"
+          }
+        }
+      },
+      "WorldEntitySummaryDto": {
+        "type": "object",
+        "description": "Summary representation of a world entity",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the entity"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of the entity (e.g. OBJECT, ZONE)",
+            "enum": [
+              "OBJECT",
+              "CITIZEN",
+              "ZONE",
+              "SPEECH"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Display name of the entity"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category of the entity"
+          },
+          "owned": {
+            "type": "string",
+            "description": "Name of the owner, or null if unowned"
+          },
+          "tags": {
+            "type": "array",
+            "description": "Semantic tags associated with the entity",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "x": {
+            "type": "number",
+            "format": "double",
+            "description": "X coordinate"
+          },
+          "y": {
+            "type": "number",
+            "format": "double",
+            "description": "Y coordinate"
+          },
+          "z": {
+            "type": "number",
+            "format": "double",
+            "description": "Z coordinate"
+          }
+        }
+      },
+      "WorldObjectDetailDto": {
+        "type": "object",
+        "description": "Detailed representation of a world object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the object"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of the entity",
+            "enum": [
+              "OBJECT",
+              "CITIZEN",
+              "ZONE",
+              "SPEECH"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the object"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category of the object"
+          },
+          "owned": {
+            "type": "string",
+            "description": "Name of the owner, or null if unowned"
+          },
+          "tags": {
+            "type": "array",
+            "description": "Semantic tags associated with the object",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "parentZoneId": {
+            "type": "string",
+            "description": "ID of the zone this object is located in"
+          },
+          "targetZoneId": {
+            "type": "string",
+            "description": "ID of the zone this gateway leads to (if applicable)"
+          },
+          "position": {
+            "$ref": "#/components/schemas/Vector3",
+            "description": "Position in the world"
+          },
+          "radius": {
+            "type": "number",
+            "format": "double",
+            "description": "Circular collision radius"
+          },
+          "width": {
+            "type": "number",
+            "format": "double",
+            "description": "Rectangular collision width"
+          },
+          "length": {
+            "type": "number",
+            "format": "double",
+            "description": "Rectangular collision length"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double",
+            "description": "Quantity or amount"
+          }
+        }
+      },
+      "Environment": {
+        "type": "object",
+        "properties": {
+          "terrainType": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lightLevel": {
+            "type": "string"
+          }
+        }
+      },
+      "WorldDate": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "time": {
+            "type": "string"
+          }
+        }
+      },
+      "WorldEnvironmentResponseDto": {
+        "type": "object",
+        "description": "Current world environment and date status",
+        "properties": {
+          "date": {
+            "$ref": "#/components/schemas/WorldDate",
+            "description": "Current simulation date and time"
+          },
+          "environment": {
+            "$ref": "#/components/schemas/Environment",
+            "description": "Current environmental conditions (weather, light)"
+          }
+        }
+      },
+      "ChunkInfoDto": {
+        "type": "object",
+        "description": "Information about a specific world spatial chunk",
+        "properties": {
+          "gridX": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Grid X coordinate of the chunk"
+          },
+          "gridZ": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Grid Z coordinate of the chunk"
+          },
+          "size": {
+            "type": "number",
+            "format": "double",
+            "description": "Physical size of the chunk side"
+          },
+          "entityCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of entities currently in this chunk"
+          },
+          "movementCost": {
+            "type": "number",
+            "format": "double",
+            "description": "Current movement cost multiplier for this chunk"
+          }
+        }
+      },
+      "CitizenSummaryDto": {
+        "type": "object",
+        "description": "Summary representation of a citizen",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the citizen"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the citizen"
+          },
+          "x": {
+            "type": "number",
+            "format": "double",
+            "description": "X coordinate"
+          },
+          "y": {
+            "type": "number",
+            "format": "double",
+            "description": "Y coordinate"
+          },
+          "z": {
+            "type": "number",
+            "format": "double",
+            "description": "Z coordinate"
+          },
+          "state": {
+            "type": "string",
+            "description": "Current operational state of the citizen"
+          },
+          "currentGoal": {
+            "type": "string",
+            "description": "Current active goal, if any"
+          },
+          "vitality": {
+            "type": "number",
+            "format": "double",
+            "description": "Current vitality level"
+          }
+        }
+      },
+      "ActiveTask": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "targetName": {
+            "type": "string"
+          },
+          "targetDescription": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "allowsRoutineInterruptions": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CitizenConfigDto": {
+        "type": "object",
+        "description": "Citizen configuration properties",
+        "properties": {
+          "walkingSpeed": {
+            "type": "number",
+            "format": "double",
+            "description": "Base walking speed of the citizen"
+          }
+        }
+      },
+      "CitizenDetailDto": {
+        "type": "object",
+        "description": "Detailed representation of a citizen",
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/CitizenConfigDto",
+            "description": "Citizen configuration profile"
+          },
+          "perception": {
+            "$ref": "#/components/schemas/CitizenPerception",
+            "description": "Citizen's current perception of the world"
+          },
+          "currentAction": {
+            "$ref": "#/components/schemas/LastAction",
+            "description": "Last action executed by the citizen"
+          },
+          "currentZone": {
+            "type": "string",
+            "description": "ID of the zone the citizen is currently in"
+          },
+          "explorationProgress": {
+            "type": "array",
+            "description": "Exploration progress for different zones",
+            "items": {
+              "$ref": "#/components/schemas/ZoneExplorationDto"
+            }
+          },
+          "coins": {
+            "type": "number",
+            "format": "double",
+            "description": "Current coins balance"
+          },
+          "recentMessages": {
+            "type": "array",
+            "description": "Recent speech messages",
+            "items": {
+              "$ref": "#/components/schemas/SpeechMessageDto"
+            }
+          }
+        }
+      },
+      "CitizenPerception": {
+        "type": "object",
+        "properties": {
+          "identity": {
+            "$ref": "#/components/schemas/Identity"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "IDLE",
+              "MOVING",
+              "THINKING",
+              "INTERRUPTED",
+              "BUSY",
+              "TALKING"
+            ]
+          },
+          "equipment": {
+            "$ref": "#/components/schemas/Equipment"
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/Inventory"
+          },
+          "lastAction": {
+            "$ref": "#/components/schemas/LastAction"
+          },
+          "activeTask": {
+            "$ref": "#/components/schemas/ActiveTask"
+          },
+          "position": {
+            "$ref": "#/components/schemas/Vector3"
+          },
+          "mentalMap": {
+            "$ref": "#/components/schemas/MentalMap"
+          },
+          "recentMessages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpeechMessage"
+            }
+          },
+          "coins": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CognitiveAnchor": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "distance": {
+            "type": "number",
+            "format": "double"
+          },
+          "range": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          }
+        }
+      },
+      "Equipment": {
+        "type": "object",
+        "properties": {
+          "leftHand": {
+            "$ref": "#/components/schemas/EquippedItem"
+          },
+          "rightHand": {
+            "$ref": "#/components/schemas/EquippedItem"
+          }
+        }
+      },
+      "EquippedItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "radius": {
+            "type": "number",
+            "format": "double"
+          },
+          "width": {
+            "type": "number",
+            "format": "double"
+          },
+          "length": {
+            "type": "number",
+            "format": "double"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ExplorationStatus": {
+        "type": "object",
+        "properties": {
+          "percentage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fullyExplored": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Identity": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "job": {
+            "type": "string"
+          },
+          "workplace_tag": {
+            "type": "string"
+          },
+          "traits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skills": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "Inventory": {
+        "type": "object",
+        "properties": {
+          "capacity": {
+            "$ref": "#/components/schemas/InventoryCapacity"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemData"
+            }
+          }
+        }
+      },
+      "InventoryCapacity": {
+        "type": "object",
+        "properties": {
+          "usedSlots": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxSlots": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ItemData": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "radius": {
+            "type": "number",
+            "format": "double"
+          },
+          "width": {
+            "type": "number",
+            "format": "double"
+          },
+          "length": {
+            "type": "number",
+            "format": "double"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "LastAction": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reasoningWas": {
+            "type": "string"
+          },
+          "resultMessage": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "MentalMap": {
+        "type": "object",
+        "properties": {
+          "home": {
+            "$ref": "#/components/schemas/CognitiveAnchor"
+          },
+          "nearestCity": {
+            "$ref": "#/components/schemas/CognitiveAnchor"
+          },
+          "currentZoneMemory": {
+            "$ref": "#/components/schemas/ZoneMemory"
+          },
+          "knownZones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZoneMemorySummary"
+            }
+          }
+        }
+      },
+      "RememberedPOI": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "relativeDirection": {
+            "type": "string"
+          }
+        }
+      },
+      "SpeechMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "NEUTRAL",
+              "WHISPER",
+              "CHEERFUL",
+              "AGGRESSIVE",
+              "URGENT",
+              "DIRECT_QUESTION"
+            ]
+          }
+        }
+      },
+      "SpeechMessageDto": {
+        "type": "object",
+        "description": "Represents a speech message perceived or emitted",
+        "properties": {
+          "sourceName": {
+            "type": "string",
+            "description": "Name of the entity that spoke"
+          },
+          "targetName": {
+            "type": "string",
+            "description": "Name of the entity the speech is directed to, if any"
+          },
+          "message": {
+            "type": "string",
+            "description": "The actual spoken message"
+          },
+          "tone": {
+            "type": "string",
+            "description": "The tone of the speech"
+          }
+        }
+      },
+      "Status": {
+        "type": "object",
+        "properties": {
+          "vitality": {
+            "type": "number",
+            "format": "double"
+          },
+          "hunger": {
+            "type": "number",
+            "format": "double"
+          },
+          "energy": {
+            "type": "number",
+            "format": "double"
+          },
+          "stress": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ZoneExplorationDto": {
+        "type": "object",
+        "description": "Exploration progress of a specific zone",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the zone"
+          },
+          "percentage": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Exploration percentage (0-100)"
+          }
+        }
+      },
+      "ZoneMemory": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "zoneType": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "exploration": {
+            "$ref": "#/components/schemas/ExplorationStatus"
+          },
+          "rememberedPOIs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RememberedPOI"
+            }
+          }
+        }
+      },
+      "ZoneMemorySummary": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "zoneType": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "explorationPercentage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fullyExplored": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CitizenCognitionDto": {
+        "type": "object",
+        "description": "Represents a step in the citizen's thought process",
+        "properties": {
+          "citizenId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the citizen"
+          },
+          "tick": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Simulation tick when this thought occurred"
+          },
+          "reasoning": {
+            "type": "string",
+            "description": "Detailed reasoning and internal thoughts"
+          },
+          "actionTarget": {
+            "type": "string",
+            "description": "Target of the intended action (if any)"
+          }
+        }
+      },
+      "CitizenInMapDto": {
+        "type": "object",
+        "description": "Map representation of a citizen",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the citizen"
+          },
+          "x": {
+            "type": "number",
+            "format": "double",
+            "description": "X coordinate"
+          },
+          "z": {
+            "type": "number",
+            "format": "double",
+            "description": "Z coordinate"
+          },
+          "state": {
+            "type": "string",
+            "description": "Current operational state of the citizen"
+          }
+        }
+      }
+    }
+  }
+}
