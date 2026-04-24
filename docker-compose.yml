@@ -1,0 +1,13 @@
+services:
+  caosmos-ui:
+    # Use 'image' for remote registry or 'build' for local development
+    # image: ghcr.io/alexpi8/caosmos-ui:latest
+    build:
+      context: .
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8080}
+    image: caosmos-ui:latest
+    container_name: caosmos-ui
+    ports:
+      - "${PORT:-5173}:80"
+    restart: unless-stopped
