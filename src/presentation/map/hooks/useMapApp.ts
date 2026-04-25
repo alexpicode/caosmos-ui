@@ -63,7 +63,7 @@ export function useMapApp(containerRef: React.RefObject<HTMLDivElement | null>) 
     return () => {
       isDestroyed = true;
       if (fallbackApp) {
-        try { fallbackApp.destroy(true, { children: true }); } catch (e) { }
+        try { fallbackApp.destroy(true, { children: true }); } catch (e) { /* Ignore destroy errors on unmount */ }
       }
       appRef.current = null;
     };
