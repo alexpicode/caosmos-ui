@@ -90,7 +90,9 @@ export function AnalyticsView() {
   const [sortKey, setSortKey] = React.useState<keyof CitizenSummary>('vitality');
   const [sortAsc, setSortAsc] = React.useState(true);
 
-  const allCitizens = Array.from(citizens.values()).map(t => t.current);
+  const allCitizens = Array.from(citizens.values())
+    .map(t => t.current)
+    .filter((c): c is CitizenSummary => !!c && !!c.uuid);
 
   const stateDistribution = countByField(allCitizens, 'state');
   const scatterData = allCitizens.map(c => ({ x: c.vitality, y: c.x, z: c.z, name: c.name }));
@@ -98,7 +100,7 @@ export function AnalyticsView() {
 
   const treemapData = {
     name: 'Population',
-    children: goalDistribution.map(g => ({ name: g.name, size: g.value }))
+    children: goalDistribution.map(g => ({ name: g.name, size: g.value || 1 }))
   };
 
   const filtered = allCitizens
@@ -166,7 +168,7 @@ export function AnalyticsView() {
                 tick={{ fill: '#94a3b8', fontSize: 10 }} label={{ value: 'Vitality', position: 'insideBottom', fill: '#475569', fontSize: 10 }} />
               <YAxis type="number" dataKey="y" name="X pos" tick={{ fill: '#94a3b8', fontSize: 10 }} />
               <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: '#334155' }}
-                formatter={(val: unknown) => [(val as number).toFixed(1), '']} />
+                formatter={(val: unknown) => [typeof val === 'number' ? val.toFixed(1) : '—', '']} />
 
               <Scatter data={scatterData}>
                 {scatterData.map((entry, i) => (
@@ -186,22 +188,16 @@ export function AnalyticsView() {
               dataKey="size"
               nameKey="name"
               animationDuration={400}
-              content={(props: { 
-                x: number; 
-                y: number; 
-                width: number; 
-                height: number; 
-                index: number; 
-                name?: string; 
-              }) => {
+              content={(props: any) => {
+                const { x = 0, y = 0, width = 0, height = 0, index = 0, name = '' } = props;
                 const colors = ['#06b6d4','#8b5cf6','#10b981','#f59e0b','#3b82f6','#ef4444'];
                 return (
                   <g>
-                    <rect x={props.x} y={props.y} width={props.width} height={props.height}
-                      fill={colors[props.index % colors.length]} fillOpacity={0.5}
+                    <rect x={x} y={y} width={width} height={height}
+                      fill={colors[index % colors.length]} fillOpacity={0.5}
                       stroke="#020617" strokeWidth={1} />
-                    {props.width > 40 && props.height > 20 && props.name && (
-                      <text x={props.x + 4} y={props.y + 14} fontSize={9} fill="#f1f5f9">{props.name.slice(0, 18)}</text>
+                    {width > 40 && height > 20 && name && (
+                      <text x={x + 4} y={y + 14} fontSize={9} fill="#f1f5f9">{name.slice(0, 18)}</text>
                     )}
                   </g>
                 );

@@ -104,6 +104,51 @@ export interface ActiveTask {
   completed: boolean;
 }
 
+export interface CognitiveAnchor {
+  name: string;
+  distance: number;
+  range: string;
+  direction: string;
+}
+
+export interface ExplorationStatus {
+  percentage: number;
+  fullyExplored: boolean;
+}
+
+export interface RememberedPOI {
+  id: string;
+  name: string;
+  category: string;
+  tags: string[];
+  relativeDirection: string;
+}
+
+export interface ZoneMemory {
+  zoneId: string;
+  name: string;
+  zoneType: string;
+  category: string;
+  exploration: ExplorationStatus;
+  rememberedPOIs: RememberedPOI[];
+}
+
+export interface ZoneMemorySummary {
+  zoneId: string;
+  name: string;
+  zoneType: string;
+  category: string;
+  explorationPercentage: number;
+  fullyExplored: boolean;
+}
+
+export interface MentalMap {
+  home?: CognitiveAnchor;
+  nearestCity?: CognitiveAnchor;
+  currentZoneMemory?: ZoneMemory;
+  knownZones: ZoneMemorySummary[];
+}
+
 export interface CitizenPerception {
   identity: Identity;
   status: CitizenStatus;
@@ -113,6 +158,9 @@ export interface CitizenPerception {
   lastAction: LastAction | null;
   activeTask: ActiveTask | null;
   position: Vector3;
+  mentalMap?: MentalMap;
+  recentMessages: SpeechMessage[];
+  coins: number;
 }
 
 
@@ -144,9 +192,9 @@ export interface CitizenDetail {
 }
 
 export interface CognitionEntry {
-  entityId: string;
+  citizenId: string;
   tick: number;
-  thoughtProcess: string;
+  reasoning: string;
   actionTarget: string;
 }
 
@@ -157,6 +205,9 @@ export interface WorldObject {
   y: number;
   z: number;
   displayName: string;
+  category?: string;
+  owned?: string | null;
+  tags: string[];
   properties: Record<string, unknown>;
 }
 
@@ -178,6 +229,11 @@ export interface Zone {
   id: string;
   name: string;
   type: string;
+  category?: string;
+  owned?: string | null;
+  tags: string[];
+  isEntryRestricted: boolean;
+  parentZoneId?: string | null;
   center: Vector3;
   width: number;
   length: number;

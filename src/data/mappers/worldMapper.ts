@@ -27,6 +27,9 @@ export function mapWorldObject(raw: any): WorldObject {
     y: Number(raw?.y || 0),
     z: Number(raw?.z || 0),
     displayName: String(raw?.displayName || raw?.id || 'Unknown Object'),
+    category: raw?.category ? String(raw.category) : undefined,
+    owned: raw?.owned ? String(raw.owned) : null,
+    tags: Array.isArray(raw?.tags) ? raw.tags.map(String) : [],
     properties: raw?.properties || {},
   };
 }
@@ -54,6 +57,11 @@ export function mapZone(raw: Raw): Zone {
     id: str(raw?.id),
     name: str(raw?.name, 'Unnamed Zone'),
     type: str(raw?.type, 'UNKNOWN'),
+    category: raw?.category ? str(raw.category) : undefined,
+    owned: raw?.owned ? str(raw.owned) : null,
+    tags: Array.isArray(raw?.tags) ? raw.tags.map((t: string) => str(t)) : [],
+    isEntryRestricted: !!raw?.isEntryRestricted,
+    parentZoneId: raw?.parentZoneId ? str(raw.parentZoneId) : null,
     center: mapVector3(raw?.center),
     width: num(raw?.width),
     length: num(raw?.length),
