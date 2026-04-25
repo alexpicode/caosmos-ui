@@ -33,7 +33,7 @@ export function useMapInteraction(
       maxZ: Math.max(tl.z, br.z)
     });
     setZoomLevel(zoomRef.current);
-  }, [setViewportBounds, setZoomLevel]);
+  }, [setViewportBounds, setZoomLevel, cameraRef, zoomRef]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
@@ -48,7 +48,7 @@ export function useMapInteraction(
 
     updateViewportBounds(W, H, true);
     onViewChange();
-  }, [appRef, updateViewportBounds, onViewChange]);
+  }, [appRef, updateViewportBounds, onViewChange, zoomRef]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -79,7 +79,7 @@ export function useMapInteraction(
 
     updateViewportBounds(W, H);
     onViewChange();
-  }, [appRef, updateViewportBounds, onViewChange]);
+  }, [appRef, updateViewportBounds, onViewChange, cameraRef, zoomRef]);
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;

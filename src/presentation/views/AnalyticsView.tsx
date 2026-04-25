@@ -186,7 +186,14 @@ export function AnalyticsView() {
               dataKey="size"
               nameKey="name"
               animationDuration={400}
-              content={(props: any) => {
+              content={(props: { 
+                x: number; 
+                y: number; 
+                width: number; 
+                height: number; 
+                index: number; 
+                name?: string; 
+              }) => {
                 const colors = ['#06b6d4','#8b5cf6','#10b981','#f59e0b','#3b82f6','#ef4444'];
                 return (
                   <g>
