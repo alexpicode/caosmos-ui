@@ -28,6 +28,21 @@ It is designed to be used in tandem with the backend engine to provide developer
 
 Designed with **Clean Architecture** principles and built for extreme performance, Caosmos UI leverages PixiJS for smooth 2D rendering and React 19 for a modern, responsive interface.
 
+> [!WARNING]
+> **Project Status: Experimental**
+> This interface is currently in an experimental phase. It is designed as a basic visualization tool to observe and debug the events occurring within the **Caosmos** simulation. Features and layout may change frequently.
+
+## 🖼️ Preview
+
+<details>
+<summary>Click to view application screenshot</summary>
+<p align="center">
+  <img src="docs/assets/caosmos-ui_screenshot_1.png" alt="Caosmos UI Screenshot" width="100%" />
+</p>
+</details>
+
+---
+
 ## ✨ Key Features
 
 -   **🛰️ Real-time Map Visualization**: High-performance 2D viewport using PixiJS, capable of rendering thousands of entities, zones, and environmental effects.
