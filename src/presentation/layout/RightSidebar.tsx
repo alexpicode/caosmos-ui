@@ -4,7 +4,16 @@ import { useWorldStore } from '@store/useWorldStore';
 import { useUIStore } from '@store/useUIStore';
 import { useCitizenDetail, useCognitionPolling } from '@shared/hooks/usePolling';
 import { vitalityColor, stateBadgeClass, truncate } from '@shared/utils/formatters';
-import type { CitizenDetail, CognitionEntry, CitizenSummary, SpeechMessage, ExplorationProgress } from '@core/entities';
+import type { 
+  CitizenDetail, 
+  CognitionEntry, 
+  CitizenSummary, 
+  SpeechMessage, 
+  ExplorationProgress,
+  MentalMap,
+  CognitiveAnchor,
+  ZoneMemorySummary
+} from '@core/entities';
 
 // ─── Sub-components ──────────────────────────────
 
@@ -101,6 +110,94 @@ function RecentMessagesList({ messages }: { messages: SpeechMessage[] }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function CognitiveAnchorCard({ anchor, label }: { anchor: CognitiveAnchor; label: string }) {
+  return (
+    <div 
+      className="flex flex-col gap-1 p-2 rounded border border-slate-700/50 bg-slate-800/30"
+    >
+      <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-wider text-slate-500">
+        <span>{label}</span>
+        <span className="text-cyan-400 font-mono">{anchor.range}</span>
+      </div>
+      <div className="text-xs font-medium text-slate-200 truncate">{anchor.name}</div>
+      <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+        <span>{anchor.distance.toFixed(1)}m</span>
+        <span className="text-cyan-500/70">{anchor.direction}</span>
+      </div>
+    </div>
+  );
+}
+
+function MentalMapSection({ mentalMap }: { mentalMap?: MentalMap }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  if (!mentalMap) return null;
+
+  const hasAnchors = mentalMap.home || mentalMap.nearestCity;
+  const hasZones = mentalMap.knownZones.length > 0;
+
+  if (!hasAnchors && !hasZones) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full text-slate-500 text-xs uppercase hover:text-slate-300 transition-colors group"
+      >
+        <div className="flex items-center gap-2">
+          <span>Mental Map</span>
+          <span className="badge badge-idle text-[10px] leading-none px-1.5 opacity-60">
+            {mentalMap.knownZones.length}
+          </span>
+        </div>
+        <span className={`text-[10px] transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}>
+          ▶
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="flex flex-col gap-3 animate-fade-in pl-1 border-l border-slate-800 ml-1 mt-1">
+          {/* Anchors */}
+          {hasAnchors && (
+            <div className="grid grid-cols-2 gap-2">
+              {mentalMap.home && <CognitiveAnchorCard label="Home" anchor={mentalMap.home} />}
+              {mentalMap.nearestCity && <CognitiveAnchorCard label="Nearest City" anchor={mentalMap.nearestCity} />}
+            </div>
+          )}
+
+          {/* Known Zones */}
+          {hasZones && (
+            <div className="flex flex-col gap-1.5">
+              <h5 className="text-[9px] uppercase font-bold tracking-widest text-slate-600 mb-0.5">Known Regions</h5>
+              {mentalMap.knownZones.map((zone: ZoneMemorySummary) => (
+                <div 
+                  key={zone.zoneId}
+                  className="flex flex-col gap-1 px-2 py-1.5 rounded bg-slate-800/40 border border-slate-700/20"
+                >
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-slate-300 font-medium truncate">{zone.name}</span>
+                    <span className={zone.fullyExplored ? 'text-green-400' : 'text-slate-500'}>
+                      {zone.fullyExplored ? '✓' : `${zone.explorationPercentage}%`}
+                    </span>
+                  </div>
+                  {!zone.fullyExplored && (
+                    <div className="h-0.5 w-full bg-slate-900 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-slate-600 transition-all duration-500" 
+                        style={{ width: `${zone.explorationPercentage}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -228,6 +325,9 @@ function CitizenInspector({ detail, uuid }: { detail: CitizenDetail; uuid: strin
       {/* Exploration (Collapsible) */}
       <ExplorationProgressList progress={detail.explorationProgress} />
 
+      {/* Mental Map (New) */}
+      <MentalMapSection mentalMap={perception.mentalMap} />
+
       {/* Active Task */}
       {activeTask && (
         <div className="p-2.5 rounded-lg" style={{ background: 'rgba(30,41,59,0.7)', border: '1px solid rgba(100,116,139,0.2)' }}>
@@ -343,7 +443,7 @@ function CognitionEntryCard({ entry }: { entry: CognitionEntry }) {
         <span className="text-slate-500 text-xs truncate max-w-24">{entry.actionTarget}</span>
       </div>
       <p className="text-slate-400 text-xs leading-relaxed">
-        {expanded ? entry.thoughtProcess : truncate(entry.thoughtProcess, 80)}
+        {expanded ? entry.reasoning : truncate(entry.reasoning, 80)}
       </p>
     </button>
   );

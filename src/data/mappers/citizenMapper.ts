@@ -10,6 +10,11 @@ import type {
   InventoryItem,
   LastAction,
   ActiveTask,
+  MentalMap,
+  CognitiveAnchor,
+  ZoneMemory,
+  ZoneMemorySummary,
+  RememberedPOI,
   CognitionEntry,
   Vector3,
   SpeechMessage,
@@ -112,6 +117,61 @@ function mapActiveTask(raw: Raw): ActiveTask | null {
   };
 }
 
+function mapCognitiveAnchor(raw: Raw): CognitiveAnchor | undefined {
+  if (!raw) return undefined;
+  return {
+    name: str(raw.name),
+    distance: num(raw.distance),
+    range: str(raw.range, 'UNKNOWN'),
+    direction: str(raw.direction, 'CENTER'),
+  };
+}
+
+function mapRememberedPOI(raw: Raw): RememberedPOI {
+  return {
+    id: str(raw?.id, ''),
+    name: str(raw?.name),
+    category: str(raw?.category, 'UNKNOWN'),
+    tags: arr<string>(raw?.tags),
+    relativeDirection: str(raw?.relativeDirection, 'UNKNOWN'),
+  };
+}
+
+function mapZoneMemory(raw: Raw): ZoneMemory | undefined {
+  if (!raw) return undefined;
+  return {
+    zoneId: str(raw.zoneId, ''),
+    name: str(raw.name),
+    zoneType: str(raw.zoneType, 'UNKNOWN'),
+    category: str(raw.category, 'UNKNOWN'),
+    exploration: {
+      percentage: num(raw.exploration?.percentage),
+      fullyExplored: bool(raw.exploration?.fullyExplored),
+    },
+    rememberedPOIs: arr<Raw>(raw.rememberedPOIs).map(mapRememberedPOI),
+  };
+}
+
+function mapZoneMemorySummary(raw: Raw): ZoneMemorySummary {
+  return {
+    zoneId: str(raw?.zoneId, ''),
+    name: str(raw?.name),
+    zoneType: str(raw?.zoneType, 'UNKNOWN'),
+    category: str(raw?.category, 'UNKNOWN'),
+    explorationPercentage: num(raw?.explorationPercentage),
+    fullyExplored: bool(raw?.fullyExplored),
+  };
+}
+
+function mapMentalMap(raw: Raw): MentalMap {
+  return {
+    home: mapCognitiveAnchor(raw?.home),
+    nearestCity: mapCognitiveAnchor(raw?.nearestCity),
+    currentZoneMemory: mapZoneMemory(raw?.currentZoneMemory),
+    knownZones: arr<Raw>(raw?.knownZones).map(mapZoneMemorySummary),
+  };
+}
+
 function mapPerception(raw: Raw): CitizenPerception {
   return {
     identity: mapIdentity(raw?.identity),
@@ -122,6 +182,9 @@ function mapPerception(raw: Raw): CitizenPerception {
     lastAction: mapLastAction(raw?.lastAction),
     activeTask: mapActiveTask(raw?.activeTask),
     position: mapVector3(raw?.position),
+    mentalMap: mapMentalMap(raw?.mentalMap),
+    recentMessages: arr<Raw>(raw?.recentMessages).map(mapSpeechMessage),
+    coins: num(raw?.coins),
   };
 }
 
@@ -167,9 +230,9 @@ export function mapCitizenDetail(raw: Raw): CitizenDetail {
 
 export function mapCognitionEntry(raw: Raw): CognitionEntry {
   return {
-    entityId: str(raw?.entityId, ''),
+    citizenId: str(raw?.citizenId || raw?.entityId, ''),
     tick: num(raw?.tick),
-    thoughtProcess: str(raw?.thoughtProcess, ''),
+    reasoning: str(raw?.reasoning || raw?.thoughtProcess, ''),
     actionTarget: str(raw?.actionTarget, ''),
   };
 }

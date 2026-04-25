@@ -66,7 +66,7 @@ export function drawCitizenGlyph(
   // State indicator dot (stress/hunger)
   if (c.vitality < 35) {
     g.circle(CITIZEN_RADIUS - 2, -(CITIZEN_RADIUS - 2), 3)
-      .fill({ color: 0xef4444 });
+      .fill({ color: 0xd97706 });
   }
 }
 
@@ -136,16 +136,18 @@ export function renderZones(
     const { g, label } = sprite;
     const color = isInterior ? 0x6366f1 : 0x8b5cf6;
     const fillColor = isInterior ? 0x1e1b4b : color;
+    const strokeColor = zone.isEntryRestricted ? 0xd97706 : color;
+    const strokeWidth = zone.isEntryRestricted ? 1.5 : (isInterior ? 1.5 : 1);
     
     g.clear();
     if (isInterior) {
       g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
         .fill({ color: fillColor, alpha: 0.4 })
-        .stroke({ color, width: 1.5, alpha: 0.6, alignment: 1 });
+        .stroke({ color: strokeColor, width: strokeWidth, alpha: 0.6, alignment: 1 });
     } else {
       g.rect(sx - hw, sy - hh, hw * 2, hh * 2)
         .fill({ color, alpha: 0.02 })
-        .stroke({ color, width: 1, alpha: 0.2 });
+        .stroke({ color: strokeColor, width: strokeWidth, alpha: zone.isEntryRestricted ? 0.8 : 0.2 });
     }
 
     label.x = sx - label.width / 2;
