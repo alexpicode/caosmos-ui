@@ -15,13 +15,14 @@
   <img src="https://img.shields.io/badge/Tailwind_CSS-4.0-06B6D4?logo=tailwind-css&logoColor=white&style=for-the-badge" alt="Tailwind CSS" />
   <img src="https://img.shields.io/badge/PixiJS-8.17-E91E63?logo=pixijs&logoColor=white&style=for-the-badge" alt="PixiJS" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge" alt="License: AGPL-3.0" />
+  <a href="mailto:alexpicode@proton.me"><img src="https://img.shields.io/badge/Contact-alexpicode%40proton.me-blue?style=for-the-badge&logo=protonmail" alt="Email"></a>
 </p>
 
 ---
 
 ## 🌌 Overview
 
-**Caosmos UI** is the official frontend companion for the [Caosmos Engine](https://github.com/Alexpi8/caosmos). While the engine handles the complex AI cognition, spatial logic, and simulation physics, this dashboard provides a high-performance, real-time visualization layer.
+**Caosmos UI** is the official frontend companion for the [Caosmos Engine](https://github.com/alexpicode/caosmos). While the engine handles the complex AI cognition, spatial logic, and simulation physics, this dashboard provides a high-performance, real-time visualization layer.
 
 It is designed to be used in tandem with the backend engine to provide developers, researchers, and users with a deep look into the autonomous behavior of AI "Citizens" within the simulated world.
 
@@ -62,32 +63,62 @@ The project follows a strict **Clean Architecture** pattern to ensure maintainab
 
 -   [Node.js](https://nodejs.org/) (v20 or higher recommended)
 -   [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+-   [Docker](https://www.docker.com/) (Optional, for containerized deployment)
 
-### Installation
+---
 
-1.  Clone the repository:
+## 🐳 Docker Deployment (Recommended)
+
+The easiest way to run Caosmos UI in a production-ready environment is using Docker.
+
+### Running with Docker Compose
+
+1.  Ensure you have Docker and Docker Compose installed.
+2.  Run the following command to build and start the container:
     ```bash
-    git clone https://github.com/Alexpi8/caosmos-ui.git
-    cd caosmos-ui
+    docker compose up -d --build
     ```
+3.  The UI will be available at `http://localhost:5173` (by default).
 
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
+### Configuration
 
-3.  Set up environment variables:
-    Create a `.env` file based on `.env.example` (if available) and configure your `VITE_API_BASE_URL` to point to your running [Caosmos Engine](https://github.com/Alexpi8/caosmos) instance.
+You can customize the deployment using environment variables:
 
-    > [!IMPORTANT]
-    > This UI requires a running instance of the **Caosmos Backend** to function. Ensure the backend is active and reachable via the configured API URL.
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `PORT` | The host port where the UI will be accessible. | `5173` |
+| `VITE_API_BASE_URL` | The URL of the running Caosmos Engine API. | `http://localhost:8080` |
 
-4.  Start the development server:
-    ```bash
-    npm run dev
-    ```
+---
 
-### Building for Production
+## 🚀 Local Development
+
+If you prefer to run the project directly on your machine without Docker:
+
+### 1. Installation
+
+```bash
+git clone https://github.com/alexpicode/caosmos-ui.git
+cd caosmos-ui
+npm install
+```
+
+### 2. Environment Setup
+
+Create a `.env` file based on `.env.example` and configure your `VITE_API_BASE_URL`.
+
+> [!IMPORTANT]
+> This UI requires a running instance of the **Caosmos Backend** to function.
+
+### 3. Run Development Server
+
+```bash
+npm run dev
+```
+
+### 4. Manual Production Build
+
+To generate a static build in the `dist/` folder:
 
 ```bash
 npm run build
@@ -95,16 +126,21 @@ npm run build
 
 ## 🤝 Contributing
 
-We welcome contributions! Whether you're fixing bugs, adding new features, or improving documentation, please feel free to open a Pull Request.
+We welcome explorers and architects! To get started, please read our [**Contributing Guide**](CONTRIBUTING.md).
 
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git checkout origin feature/AmazingFeature`)
-5.  Open a Pull Request
+1.  Open an issue for discussion before starting major changes.
+2.  Submit a PR for bug fixes or new features.
+
+---
+
+## 📬 Contact
+
+If you have any questions, suggestions, or would like to collaborate, feel free to reach out:
+
+📧 **Email**: [alexpicode@proton.me](mailto:alexpicode@proton.me)
 
 ---
 
 <p align="center">
-  Built with ❤️ for the AI community by <a href="https://github.com/Alexpi8">Alexpi8</a>
+  Built with ❤️ for the AI community by <a href="https://github.com/alexpicode">alexpicode</a>
 </p>
