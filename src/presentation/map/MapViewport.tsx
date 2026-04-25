@@ -186,7 +186,7 @@ export function MapViewport() {
     if (containerRef.current) ro.observe(containerRef.current);
 
     return () => {
-      app.ticker.remove(tick);
+      if (app.ticker) app.ticker.remove(tick);
       ro.disconnect();
     };
   }, [isReady, appRef, layers, updateViewportBounds, cameraRef, zoomRef, visibleLayers.trails]);
