@@ -1,7 +1,7 @@
 services:
   caosmos-ui:
     # Use 'image' for remote registry or 'build' for local development
-    image: ghcr.io/alexpi8/caosmos-ui:latest
+    image: ghcr.io/alexpicode/caosmos-ui:latest
 #    build:
 #     context: .
 #     args:
