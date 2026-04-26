@@ -3,6 +3,7 @@ import { Application, Container } from 'pixi.js';
 
 export function useMapApp(containerRef: React.RefObject<HTMLDivElement | null>) {
   const appRef = useRef<Application | null>(null);
+  const worldContainerRef = useRef<Container | null>(null);
   const terrainLayerRef = useRef<Container | null>(null);
   const zoneLayerRef = useRef<Container | null>(null);
   const worldObjectLayerRef = useRef<Container | null>(null);
@@ -40,14 +41,19 @@ export function useMapApp(containerRef: React.RefObject<HTMLDivElement | null>) 
       if (!containerRef.current) return;
       containerRef.current.appendChild(app.canvas);
 
-      // Setup layers
+      // Setup world container for panning/scaling
+      const world = new Container();
+      app.stage.addChild(world);
+      worldContainerRef.current = world;
+
+      // Setup layers as children of world
       const terrain = new Container();
       const zones = new Container();
       const worldObjects = new Container();
       const trails = new Container();
       const citizens = new Container();
 
-      app.stage.addChild(terrain, zones, worldObjects, trails, citizens);
+      world.addChild(terrain, zones, worldObjects, trails, citizens);
 
       terrainLayerRef.current = terrain;
       zoneLayerRef.current = zones;
@@ -72,6 +78,7 @@ export function useMapApp(containerRef: React.RefObject<HTMLDivElement | null>) 
   return useMemo(() => ({
     appRef,
     layers: {
+      world: worldContainerRef,
       terrain: terrainLayerRef,
       zones: zoneLayerRef,
       worldObjects: worldObjectLayerRef,

@@ -15,7 +15,8 @@ import {
   renderZones,
   renderWorldObjects,
   drawChunkGrid,
-  renderTrails
+  renderTrails,
+  WORLD_SCALE
 } from './renderers';
 import { useMapApp } from './hooks/useMapApp';
 import { useMapInteraction } from './hooks/useMapInteraction';
@@ -59,44 +60,80 @@ export function MapViewport() {
 
   const cameraRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1.0);
+  const lastZoomRef = useRef(1.0);
   const selectedIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+  const updateTransform = useCallback(() => {
+    const world = layers.world.current;
+    const app = appRef.current;
+    if (!world || !app) return;
+
+    const W = app.renderer.width / (window.devicePixelRatio || 1);
+    const H = app.renderer.height / (window.devicePixelRatio || 1);
+    const zoom = zoomRef.current;
+    const scale = zoom; // Changed: scale is just zoom, children handle WORLD_SCALE
+
+    world.scale.set(scale);
+    world.position.set(
+      W / 2 - cameraRef.current.x * scale,
+      H / 2 - cameraRef.current.y * scale
+    );
+  }, [layers.world, appRef]);
 
   const updateCitizenPositions = useCallback((W: number, H: number) => {
+    const currentZoom = zoomRef.current;
+    const zoomChanged = Math.abs(currentZoom - lastZoomRef.current) > 0.01;
+    const crossedThreshold = (lastZoomRef.current >= 0.4 && currentZoom < 0.4) || (lastZoomRef.current < 0.4 && currentZoom >= 0.4);
+    
     citizenSprites.current.forEach((sprite, id) => {
       const interp = citizenInterp.current.get(id);
       if (sprite && interp) {
-        const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
-        sprite.x = sx;
-        sprite.y = sy;
-      }
-      
-      // Update glyph (vision circle etc)
-      const tracked = citizens.get(id);
-      if (tracked) {
-        const g = sprite.children[0] as Graphics;
-        if (g) drawCitizenGlyph(g, tracked.current, id === selectedId, zoomRef.current);
+        // Now using world coordinates directly for sprites
+        sprite.x = interp.currentX * WORLD_SCALE;
+        sprite.y = -interp.currentZ * WORLD_SCALE;
+
+        // Optimization: Only redraw glyph if zoom changed significantly, 
+        // or if it's the selected citizen (vision range changes with zoom)
+        const isSelected = id === selectedId;
+        if (zoomChanged || crossedThreshold || isSelected) {
+          const tracked = citizens.get(id);
+          if (tracked) {
+            const g = sprite.children[0] as Graphics;
+            if (g) drawCitizenGlyph(g, tracked.current, isSelected, currentZoom);
+          }
+        }
       }
     });
+
+    if (zoomChanged || crossedThreshold) {
+      lastZoomRef.current = currentZoom;
+    }
   }, [citizens, selectedId]);
 
   const onViewChange = useCallback(() => {
-    // Re-render when view changes
+    updateTransform();
+
     const app = appRef.current;
     if (!app) return;
     const W = app.renderer.width / (window.devicePixelRatio || 1);
     const H = app.renderer.height / (window.devicePixelRatio || 1);
     
-    if (layers.zones.current) renderZones(layers.zones.current, useWorldStore.getState().zones, zoneSprites.current, cameraRef.current, zoomRef.current, W, H);
-    if (layers.terrain.current) drawChunkGrid(layers.terrain.current, useWorldStore.getState().chunks, cameraRef.current, zoomRef.current, W, H);
-    if (layers.worldObjects.current) renderWorldObjects(layers.worldObjects.current, Array.from(useWorldStore.getState().worldObjects.values()).map(t => t.current), worldObjectSprites.current, cameraRef.current, zoomRef.current, W, H, (text, x, y) => setHoveredInfo({ text, x, y }), () => setHoveredInfo(null));
+    // Redraw LOD-dependent layers only when zoom changes or explicitly needed
+    // In world coordinates, we don't need to redraw on pan!
+    const zoom = zoomRef.current;
+    const zoomChanged = Math.abs(zoom - lastZoomRef.current) > 0.01;
+
+    if (zoomChanged) {
+      if (layers.zones.current) renderZones(layers.zones.current, useWorldStore.getState().zones, zoneSprites.current, cameraRef.current, zoom, W, H);
+      if (layers.terrain.current) drawChunkGrid(layers.terrain.current, useWorldStore.getState().chunks, cameraRef.current, zoom, W, H);
+      if (layers.worldObjects.current) renderWorldObjects(layers.worldObjects.current, Array.from(useWorldStore.getState().worldObjects.values()).map(t => t.current), worldObjectSprites.current, cameraRef.current, zoom, W, H, (text, x, y) => setHoveredInfo({ text, x, y }), () => setHoveredInfo(null));
+    }
     
-    // Update citizen/trail positions immediately on pan/zoom
     updateCitizenPositions(W, H);
-  }, [isReady, appRef, layers, updateCitizenPositions]);
+  }, [isReady, appRef, layers, updateCitizenPositions, updateTransform]);
 
   // Interaction hook
   const { 
@@ -139,16 +176,14 @@ export function MapViewport() {
           interp.currentX = interp.startX + (interp.targetX - interp.startX) * t;
           interp.currentZ = interp.startZ + (interp.targetZ - interp.startZ) * t;
           
-          const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
-          sprite.x = sx;
-          sprite.y = sy;
+          sprite.x = interp.currentX * WORLD_SCALE;
+          sprite.y = -interp.currentZ * WORLD_SCALE;
         } else {
           // Snap to target if idle or duration is zero
           interp.currentX = interp.targetX;
           interp.currentZ = interp.targetZ;
-          const { sx, sy } = worldToScreen(interp.currentX, interp.currentZ, cameraRef.current, zoomRef.current, W, H);
-          sprite.x = sx;
-          sprite.y = sy;
+          sprite.x = interp.currentX * WORLD_SCALE;
+          sprite.y = -interp.currentZ * WORLD_SCALE;
         }
       });
 
